@@ -396,6 +396,18 @@ if (!function_exists('get_ocr_words')) {
     }
 }
 
+if (!function_exists('now')) {
+    /**
+     * 获取当前时间的Carbon实例
+     * @param \DateTimeZone|string|null $tz 时区
+     * @return \Carbon\Carbon
+     */
+    function now($tz = null): \Carbon\Carbon
+    {
+        return \Carbon\Carbon::now($tz);
+    }
+}
+
 if (!function_exists('format_chart_data_x_y_date_count')) {
     function format_chart_data_x_y_date_count(array $rawChartData, string $startDate, string $endDate, string $name = 'count_num'): array
     {

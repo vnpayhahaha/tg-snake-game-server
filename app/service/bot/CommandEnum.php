@@ -2,126 +2,175 @@
 
 namespace app\service\bot;
 
+/**
+ * Telegram贪吃蛇游戏命令枚举
+ */
 class CommandEnum
 {
-
     public const TELEGRAM_COMMAND_RUN_QUEUE_NAME = 'telegram-command-run-queue';
     public const TELEGRAM_NOTICE_QUEUE_NAME = 'telegram-notice-queue';
-    // 定义中文指令集
+
+    // 英文指令集
     public const COMMAND_SET = [
-        'help'                => 'Help',
-        'get_id'              => 'GetId',
-        'get_group_id'        => 'GetGroupId',
-        'bind'                => 'Bind',
-        'query'               => 'Query',
-        'order'               => 'Order',
-        'query_collect_order' => 'QueryCollectOrder',
-        'query_pay_order'     => 'QueryPayOrder',
-        'create_pay_order'    => 'CreatePayOrder',
-        'submit_utr'          => 'SubmitUtr',
-        'count_collect_order' => 'CountCollectOrder',
-        'count_pay_order'     => 'CountPayOrder',
+        'help'                 => 'Help',
+        'start'                => 'Start',
+        'rules'                => 'Rules',
+        'snake'                => 'Snake',
+        'bind_wallet'          => 'BindWallet',
+        'unbind_wallet'        => 'UnbindWallet',
+        'my_wallet'            => 'MyWallet',
+        'my_tickets'           => 'MyTickets',
+        'my_wins'              => 'MyWins',
+        'prize_pool'           => 'PrizePool',
+        'recent_wins'          => 'RecentWins',
+        'stats'                => 'Stats',
+        'wallet_change'        => 'WalletChange',
+        'cancel_wallet_change' => 'CancelWalletChange',
+        'group_config'         => 'GroupConfig',
+        'get_id'               => 'GetId',
+        'get_group_id'         => 'GetGroupId',
     ];
 
+    // 命令描述（英文）
     public static array $commandDescMap = [
-        'help'                => "<blockquote>[Eg] /help</blockquote>",
-        'get_id'              => "<blockquote>[Eg] /get_id</blockquote>",
-        'get_group_id'        => "<blockquote>[Eg] /get_group_id</blockquote>",
-        'bind'                => "<blockquote>[Eg] /bind 000001" . PHP_EOL . "[Param] tenant_id !Merchant ID</blockquote>",
-        'query'               => "<blockquote>[Eg] /query</blockquote>",
-        'order'               => "<blockquote>[Eg] /order CO20250723234556781156197C9" . PHP_EOL . "[Param] platform_order_no !Platform Order Number</blockquote>",
-        'query_collect_order' => "<blockquote>[Eg] /query_collect_order 123456" . PHP_EOL . "[Param] tenant_order_no !Merchant Order Number</blockquote>",
-        'query_pay_order'     => "<blockquote>[Eg] /query_pay_order 654321" . PHP_EOL . "[Param] tenant_order_no !Merchant Order Number</blockquote>",
-        'create_pay_order'    => "<blockquote>[Eg] /create_pay_order 654321 99.00 b bankName HDFC0000021 FAILURE 8019970602" . PHP_EOL .
-            "[Param] tenant_order_no !Merchant Order Number" . PHP_EOL .
-            "[Param] amount !Amount" . PHP_EOL .
-            "[Param] payment_type !Payment Type(b/u !Bank or UPI)" . PHP_EOL .
-            "[Param] payee_bank_name !Payee Bank Name(b)" . PHP_EOL .
-            "[Param] payee_bank_code !Payee Bank IFSC Code(b)" . PHP_EOL .
-            "[Param] payee_account_name !Payee Account Name(b)" . PHP_EOL .
-            "[Param] payee_account_number !Payee Account Number(b)" . PHP_EOL .
-            "[Eg] /create_pay_order 654321 99.00 u upi@gmail.com" . PHP_EOL .
-            "[Param] payee_upi !Payee UPI(u)" . PHP_EOL .
-            "</blockquote>",
-        'submit_utr'          => "<blockquote>[Eg] /submit_utr CO20250723234556781156197C9 432219999747" . PHP_EOL . "[Param] platform_order_no !Platform Order Number" . PHP_EOL . "[Param] utr !UTR credentials</blockquote>",
-        'count_collect_order' => "<blockquote>[Eg] /count_collect_order</blockquote>",
-        'count_pay_order'     => "<blockquote>[Eg] /count_pay_order</blockquote>",
+        'help'                 => "<blockquote>Show all available commands\n[Example] /help</blockquote>",
+        'start'                => "<blockquote>Get started with Snake Chain Game\n[Example] /start</blockquote>",
+        'rules'                => "<blockquote>View game rules\n[Example] /rules</blockquote>",
+        'snake'                => "<blockquote>View current snake body\n[Example] /snake</blockquote>",
+        'bind_wallet'          => "<blockquote>Bind your TRON wallet address\n[Example] /bind_wallet TRX_ADDRESS\n[Param] wallet_address - Your TRON wallet address</blockquote>",
+        'unbind_wallet'        => "<blockquote>Unbind your wallet\n[Example] /unbind_wallet</blockquote>",
+        'my_wallet'            => "<blockquote>View your wallet binding\n[Example] /my_wallet</blockquote>",
+        'my_tickets'           => "<blockquote>View your ticket numbers\n[Example] /my_tickets</blockquote>",
+        'my_wins'              => "<blockquote>View your winning records\n[Example] /my_wins</blockquote>",
+        'prize_pool'           => "<blockquote>View current prize pool amount\n[Example] /prize_pool</blockquote>",
+        'recent_wins'          => "<blockquote>View recent winning records\n[Example] /recent_wins</blockquote>",
+        'stats'                => "<blockquote>View group statistics\n[Example] /stats</blockquote>",
+        'wallet_change'        => "<blockquote>[Admin Only] Initiate wallet change\n[Example] /wallet_change NEW_WALLET_ADDRESS COOLDOWN_MINUTES\n[Param] new_wallet_address - New TRON wallet address\n[Param] cooldown_minutes - Cooldown period in minutes (1-1440)</blockquote>",
+        'cancel_wallet_change' => "<blockquote>[Admin Only] Cancel wallet change\n[Example] /cancel_wallet_change</blockquote>",
+        'group_config'         => "<blockquote>[Admin Only] View group configuration\n[Example] /group_config</blockquote>",
+        'get_id'               => "<blockquote>Get your Telegram user ID\n[Example] /get_id</blockquote>",
+        'get_group_id'         => "<blockquote>Get current group chat ID\n[Example] /get_group_id</blockquote>",
     ];
 
+    // 中文指令集
     public const COMMAND_SET_CN = [
-        '帮助'         => 'cnHelp',
-        '获取ID'       => 'cnGetId',
-        '获取群ID'     => 'cnGetGroupId',
-        '绑定'         => 'cnBind',
-        '查询'         => 'cnQuery',
-        '查询订单'     => 'cnOrder',
-        '查询收款订单' => 'cnQueryCollectOrder',
-        '查询付款订单' => 'cnQueryPayOrder',
-        '创建付款订单' => 'cnCreatePayOrder',
-        '提交UTR补单'  => 'SubmitUtr',
-        '统计收款订单' => 'cnCountCollectOrder',
-        '统计付款订单' => 'cnCountPayOrder',
-    ];
-    public static array $commandDescCnMap = [
-        '帮助'         => "<blockquote>[示例] /帮助</blockquote>",
-        '获取ID'       => "<blockquote>[示例] /获取ID</blockquote>",
-        '获取群ID'     => "<blockquote>[示例] /获取群ID</blockquote>",
-        '绑定'         => "<blockquote>[示例] /绑定 000001" . PHP_EOL . "[参数] tenant_id !商户ID</blockquote>",
-        '查询'         => "<blockquote>[示例] /查询</blockquote>",
-        '查询订单'     => "<blockquote>[示例] /查询订单 CO20250723234556781156197C9" . PHP_EOL . "[参数] platform_order_no !平台订单号</blockquote>",
-        '查询收款订单' => "<blockquote>[示例] /查询收款订单 123456" . PHP_EOL . "[参数] tenant_order_no !商户订单号</blockquote>",
-        '查询付款订单' => "<blockquote>[示例] /查询付款订单 654321" . PHP_EOL . "[参数] tenant_order_no !商户订单号</blockquote>",
-        '创建付款订单' => "<blockquote>[示例] /创建付款订单 654321 99.00 b bankName HDFC0000021 FAILURE 8019970602" . PHP_EOL .
-            "[参数] tenant_order_no !商户订单号" . PHP_EOL .
-            "[参数] amount !金额" . PHP_EOL .
-            "[参数] payment_type !支付类型(b/u !银行卡 或 UPI)" . PHP_EOL .
-            "[参数] payee_bank_name !收款银行名称(b)" . PHP_EOL .
-            "[参数] payee_bank_code !收款银行IFSC代码(b)" . PHP_EOL .
-            "[参数] payee_account_name !收款人账户名称(b)" . PHP_EOL .
-            "[参数] payee_account_number !收款人账号(b)" . PHP_EOL .
-            "[示例] /创建付款订单 654321 99.00 u upi@gmail.com" . PHP_EOL .
-            "[参数] payee_upi !收款人UPI(u)" . PHP_EOL .
-            "</blockquote>",
-        '提交UTR补单'  => "<blockquote>[示例] /提交UTR补单 CO20250723234556781156197C9 432219999747" . PHP_EOL . "[参数] platform_order_no !平台订单号" . PHP_EOL . "[参数] utr !UTR凭证</blockquote>",
-        '统计收款订单' => "<blockquote>[示例] /统计收款订单</blockquote>",
-        '统计付款订单' => "<blockquote>[示例] /统计付款订单</blockquote>",
+        '帮助'     => 'cnHelp',
+        '开始'     => 'cnStart',
+        '规则'     => 'cnRules',
+        '蛇身'     => 'cnSnake',
+        '绑定钱包' => 'cnBindWallet',
+        '解绑钱包' => 'cnUnbindWallet',
+        '我的钱包' => 'cnMyWallet',
+        '我的票号' => 'cnMyTickets',
+        '我的中奖' => 'cnMyWins',
+        '奖池'     => 'cnPrizePool',
+        '最近中奖' => 'cnRecentWins',
+        '统计'     => 'cnStats',
+        '钱包变更' => 'cnWalletChange',
+        '取消变更' => 'cnCancelWalletChange',
+        '群组配置' => 'cnGroupConfig',
+        '获取ID'   => 'cnGetId',
+        '获取群ID' => 'cnGetGroupId',
     ];
 
-    // 是否是命令
+    // 命令描述（中文）
+    public static array $commandDescCnMap = [
+        '帮助'     => "<blockquote>显示所有可用命令\n[示例] /帮助</blockquote>",
+        '开始'     => "<blockquote>开始游戏说明\n[示例] /开始</blockquote>",
+        '规则'     => "<blockquote>查看游戏规则\n[示例] /规则</blockquote>",
+        '蛇身'     => "<blockquote>查看当前蛇身\n[示例] /蛇身</blockquote>",
+        '绑定钱包' => "<blockquote>绑定您的TRON钱包地址\n[示例] /绑定钱包 TRX地址\n[参数] wallet_address - 您的TRON钱包地址</blockquote>",
+        '解绑钱包' => "<blockquote>解除钱包绑定\n[示例] /解绑钱包</blockquote>",
+        '我的钱包' => "<blockquote>查看钱包绑定\n[示例] /我的钱包</blockquote>",
+        '我的票号' => "<blockquote>查看我的票号\n[示例] /我的票号</blockquote>",
+        '我的中奖' => "<blockquote>查看我的中奖记录\n[示例] /我的中奖</blockquote>",
+        '奖池'     => "<blockquote>查看当前奖池金额\n[示例] /奖池</blockquote>",
+        '最近中奖' => "<blockquote>查看最近中奖记录\n[示例] /最近中奖</blockquote>",
+        '统计'     => "<blockquote>查看群组统计\n[示例] /统计</blockquote>",
+        '钱包变更' => "<blockquote>[仅管理员] 发起钱包变更\n[示例] /钱包变更 新钱包地址 冷却分钟数\n[参数] new_wallet_address - 新的TRON钱包地址\n[参数] cooldown_minutes - 冷却期分钟数(1-1440)</blockquote>",
+        '取消变更' => "<blockquote>[仅管理员] 取消钱包变更\n[示例] /取消变更</blockquote>",
+        '群组配置' => "<blockquote>[仅管理员] 查看群组配置\n[示例] /群组配置</blockquote>",
+        '获取ID'   => "<blockquote>获取您的Telegram用户ID\n[示例] /获取ID</blockquote>",
+        '获取群ID' => "<blockquote>获取当前群组聊天ID\n[示例] /获取群ID</blockquote>",
+    ];
+
+    /**
+     * 判断是否是命令
+     */
     public static function isCommand(string $command): bool
     {
         $command_set_cn_keys = array_keys(self::COMMAND_SET_CN);
         $command_set_keys = array_keys(self::COMMAND_SET);
-        return in_array($command, $command_set_cn_keys, true) || in_array(strtolower(trim($command)), $command_set_keys, true);
+        return in_array($command, $command_set_cn_keys, true)
+            || in_array(strtolower(trim($command)), $command_set_keys, true);
     }
 
+    /**
+     * 获取命令对应的方法名
+     */
     public static function getCommand(string $command): string
     {
         $command_set_cn_keys = array_keys(self::COMMAND_SET_CN);
         if (in_array($command, $command_set_cn_keys, true)) {
             return self::COMMAND_SET_CN[$command];
         }
+        $commandLower = strtolower(trim($command));
         $command_set_keys = array_keys(self::COMMAND_SET);
-        if (in_array(strtolower($command), $command_set_keys, true)) {
-            return self::COMMAND_SET[$command];
+        if (in_array($commandLower, $command_set_keys, true)) {
+            return self::COMMAND_SET[$commandLower];
         }
         return '';
     }
 
+    /**
+     * 获取帮助信息
+     */
     public static function getHelpReply(bool $isCn = false): array
     {
         $reply = [];
         if ($isCn) {
-            $reply[] = '***** 命令列表 *****';
-            $keys = array_keys(self::COMMAND_SET_CN);
-            foreach ($keys as $key) {
+            $reply[] = '***** 贪吃蛇链上游戏 命令列表 *****';
+            $reply[] = '';
+            $reply[] = '【玩家命令】';
+            $playerCommands = ['帮助', '开始', '规则', '蛇身', '绑定钱包', '解绑钱包', '我的钱包', '我的票号', '我的中奖', '奖池', '最近中奖', '统计'];
+            foreach ($playerCommands as $key) {
+                $reply[] = '/' . $key;
+                $reply[] = self::$commandDescCnMap[$key];
+            }
+            $reply[] = '';
+            $reply[] = '【管理员命令】';
+            $adminCommands = ['钱包变更', '取消变更', '群组配置'];
+            foreach ($adminCommands as $key) {
+                $reply[] = '/' . $key;
+                $reply[] = self::$commandDescCnMap[$key];
+            }
+            $reply[] = '';
+            $reply[] = '【工具命令】';
+            $utilCommands = ['获取ID', '获取群ID'];
+            foreach ($utilCommands as $key) {
                 $reply[] = '/' . $key;
                 $reply[] = self::$commandDescCnMap[$key];
             }
         } else {
-            $reply[] = '***** Command List *****';
-            $keys = array_keys(self::COMMAND_SET);
-            foreach ($keys as $key) {
+            $reply[] = '***** Snake Chain Game - Command List *****';
+            $reply[] = '';
+            $reply[] = '【Player Commands】';
+            $playerCommands = ['help', 'start', 'rules', 'snake', 'bind_wallet', 'unbind_wallet', 'my_wallet', 'my_tickets', 'my_wins', 'prize_pool', 'recent_wins', 'stats'];
+            foreach ($playerCommands as $key) {
+                $reply[] = '/' . $key;
+                $reply[] = self::$commandDescMap[$key];
+            }
+            $reply[] = '';
+            $reply[] = '【Admin Commands】';
+            $adminCommands = ['wallet_change', 'cancel_wallet_change', 'group_config'];
+            foreach ($adminCommands as $key) {
+                $reply[] = '/' . $key;
+                $reply[] = self::$commandDescMap[$key];
+            }
+            $reply[] = '';
+            $reply[] = '【Utility Commands】';
+            $utilCommands = ['get_id', 'get_group_id'];
+            foreach ($utilCommands as $key) {
                 $reply[] = '/' . $key;
                 $reply[] = self::$commandDescMap[$key];
             }
