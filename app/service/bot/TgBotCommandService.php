@@ -86,6 +86,10 @@ class TgBotCommandService
                 'GroupConfig', 'cnGroupConfig' => $this->handleGroupConfig($chatId, $userId, $command === 'cnGroupConfig'),
                 'GetId', 'cnGetId' => $this->handleGetId($userId, $command === 'cnGetId'),
                 'GetGroupId', 'cnGetGroupId' => $this->handleGetGroupId($chatId, $command === 'cnGetGroupId'),
+                // 管理员初始化指令
+                'BindTenant', 'cnBindTenant' => $this->handleBindTenant($chatId, $userId, $params, $command === 'cnBindTenant'),
+                'SetWallet', 'cnSetWallet' => $this->handleSetWallet($chatId, $userId, $params, $command === 'cnSetWallet'),
+                'SetBetAmount', 'cnSetBetAmount' => $this->handleSetBetAmount($chatId, $userId, $params, $command === 'cnSetBetAmount'),
                 default => $this->handleUnknown(str_starts_with($command, 'cn')),
             };
         } catch (\Throwable $e) {
@@ -831,6 +835,287 @@ class TgBotCommandService
             : "Current Group Chat ID: {$chatId}";
 
         return ['success' => true, 'message' => $text];
+    }
+
+    /**
+     * 绑定租户ID命令（管理员专用）
+     */
+    protected function handleBindTenant(int $chatId, int $userId, array $params, bool $isCn): array
+    {
+        // 验证管理员权限
+        if (!TelegramBotHelper::checkAdmin($chatId, $userId)) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '❌ 只有管理员可以执行此操作' : '❌ Only administrators can perform this action',
+            ];
+        }
+
+        // 验证参数
+        if (empty($params[0])) {
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? "❌ 请提供租户ID\n用法：/绑定租户 租户ID"
+                    : "❌ Please provide tenant ID\nUsage: /bind_tenant TENANT_ID",
+            ];
+        }
+
+        $tenantId = trim($params[0]);
+
+        try {
+            // 检查群组是否已存在配置
+            $config = $this->configService->getByTgChatId($chatId);
+
+            if ($config) {
+                // 更新租户ID
+                $this->configService->updateConfig($config->id, [
+                    'tenant_id' => $tenantId,
+                ]);
+
+                $message = $isCn
+                    ? "✅ 租户ID已更新\n" .
+                      "租户ID：{$tenantId}\n" .
+                      "群组ID：{$chatId}"
+                    : "✅ Tenant ID updated\n" .
+                      "Tenant ID: {$tenantId}\n" .
+                      "Group ID: {$chatId}";
+            } else {
+                // 创建新配置
+                $group = $this->groupService->getGroupByTgChatId($chatId);
+                if (!$group) {
+                    // 创建群组记录
+                    $group = $this->groupService->create([
+                        'tg_chat_id' => $chatId,
+                        'tg_chat_title' => 'Unknown', // 会在后续更新
+                        'tenant_id' => $tenantId,
+                        'status' => 1,
+                    ]);
+                }
+
+                // 创建群组配置
+                $this->configService->create([
+                    'tenant_id' => $tenantId,
+                    'tg_chat_id' => $chatId,
+                    'tg_chat_title' => 'Unknown',
+                    'wallet_address' => '',
+                    'bet_amount' => 5.0, // 默认5 TRX
+                    'platform_fee_rate' => 0.10, // 默认10%
+                    'wallet_change_count' => 0,
+                    'wallet_change_status' => 1,
+                    'status' => 0, // 初始状态为禁用，需要设置钱包后才能启用
+                ]);
+
+                $message = $isCn
+                    ? "✅ 租户ID已绑定\n" .
+                      "租户ID：{$tenantId}\n" .
+                      "群组ID：{$chatId}\n" .
+                      "默认投注金额：5 TRX\n\n" .
+                      "⚠️ 请继续执行以下步骤：\n" .
+                      "1️⃣ 设置收款钱包：/设置钱包 TRON地址\n" .
+                      "2️⃣ 设置投注金额（可选）：/设置投注 金额"
+                    : "✅ Tenant ID bound\n" .
+                      "Tenant ID: {$tenantId}\n" .
+                      "Group ID: {$chatId}\n" .
+                      "Default Bet Amount: 5 TRX\n\n" .
+                      "⚠️ Please continue with these steps:\n" .
+                      "1️⃣ Set wallet: /set_wallet TRON_ADDRESS\n" .
+                      "2️⃣ Set bet amount (optional): /set_bet_amount AMOUNT";
+            }
+
+            return ['success' => true, 'message' => $message];
+
+        } catch (\Throwable $e) {
+            Log::error("绑定租户ID失败", [
+                'chat_id' => $chatId,
+                'tenant_id' => $tenantId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? "❌ 绑定失败：" . $e->getMessage()
+                    : "❌ Binding failed: " . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 设置收款钱包地址命令（管理员专用）
+     */
+    protected function handleSetWallet(int $chatId, int $userId, array $params, bool $isCn): array
+    {
+        // 验证管理员权限
+        if (!TelegramBotHelper::checkAdmin($chatId, $userId)) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '❌ 只有管理员可以执行此操作' : '❌ Only administrators can perform this action',
+            ];
+        }
+
+        // 验证参数
+        if (empty($params[0])) {
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? "❌ 请提供TRON钱包地址\n用法：/设置钱包 TRON地址"
+                    : "❌ Please provide TRON wallet address\nUsage: /set_wallet TRON_ADDRESS",
+            ];
+        }
+
+        $walletAddress = trim($params[0]);
+
+        // 验证TRON地址格式
+        if (!preg_match('/^T[A-Za-z1-9]{33}$/', $walletAddress)) {
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? "❌ 无效的TRON钱包地址格式\n地址必须以T开头，长度为34位"
+                    : "❌ Invalid TRON wallet address format\nAddress must start with T and be 34 characters long",
+            ];
+        }
+
+        try {
+            // 获取群组配置
+            $config = $this->configService->getByTgChatId($chatId);
+
+            if (!$config) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "❌ 群组未配置，请先执行：/绑定租户 租户ID"
+                        : "❌ Group not configured, please first execute: /bind_tenant TENANT_ID",
+                ];
+            }
+
+            // 更新钱包地址
+            $this->configService->updateConfig($config->id, [
+                'wallet_address' => $walletAddress,
+                'wallet_change_count' => $config->wallet_change_count + 1,
+                'status' => 1, // 设置钱包后自动启用
+            ]);
+
+            $message = $isCn
+                ? "✅ 收款钱包地址已设置\n\n" .
+                  "钱包地址：<code>{$walletAddress}</code>\n" .
+                  "钱包周期：第 " . ($config->wallet_change_count + 1) . " 期\n" .
+                  "投注金额：{$config->bet_amount} TRX\n\n" .
+                  "🎮 游戏已启动！\n" .
+                  "💰 系统将每10秒监听此钱包的收款\n" .
+                  "📢 群友可以开始投注了！\n\n" .
+                  "👥 群友参与步骤：\n" .
+                  "1️⃣ 绑定钱包：/绑定钱包 您的TRON地址\n" .
+                  "2️⃣ 转账 {$config->bet_amount} TRX 到上面的钱包地址\n" .
+                  "3️⃣ 等待系统通知投注成功"
+                : "✅ Receive wallet address set\n\n" .
+                  "Wallet Address: <code>{$walletAddress}</code>\n" .
+                  "Wallet Cycle: #" . ($config->wallet_change_count + 1) . "\n" .
+                  "Bet Amount: {$config->bet_amount} TRX\n\n" .
+                  "🎮 Game started!\n" .
+                  "💰 System will monitor this wallet every 10 seconds\n" .
+                  "📢 Members can start betting now!\n\n" .
+                  "👥 How to participate:\n" .
+                  "1️⃣ Bind wallet: /bind_wallet YOUR_TRON_ADDRESS\n" .
+                  "2️⃣ Transfer {$config->bet_amount} TRX to the wallet address above\n" .
+                  "3️⃣ Wait for system notification of successful bet";
+
+            return ['success' => true, 'message' => $message];
+
+        } catch (\Throwable $e) {
+            Log::error("设置钱包地址失败", [
+                'chat_id' => $chatId,
+                'wallet_address' => $walletAddress,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? "❌ 设置失败：" . $e->getMessage()
+                    : "❌ Setup failed: " . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 设置投注金额命令（管理员专用）
+     */
+    protected function handleSetBetAmount(int $chatId, int $userId, array $params, bool $isCn): array
+    {
+        // 验证管理员权限
+        if (!TelegramBotHelper::checkAdmin($chatId, $userId)) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '❌ 只有管理员可以执行此操作' : '❌ Only administrators can perform this action',
+            ];
+        }
+
+        // 验证参数
+        if (empty($params[0])) {
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? "❌ 请提供投注金额\n用法：/设置投注 金额"
+                    : "❌ Please provide bet amount\nUsage: /set_bet_amount AMOUNT",
+            ];
+        }
+
+        $betAmount = floatval($params[0]);
+
+        // 验证金额范围
+        if ($betAmount < 0.1 || $betAmount > 10000) {
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? "❌ 投注金额必须在 0.1 - 10000 TRX 之间"
+                    : "❌ Bet amount must be between 0.1 and 10000 TRX",
+            ];
+        }
+
+        try {
+            // 获取群组配置
+            $config = $this->configService->getByTgChatId($chatId);
+
+            if (!$config) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "❌ 群组未配置，请先执行：/绑定租户 租户ID"
+                        : "❌ Group not configured, please first execute: /bind_tenant TENANT_ID",
+                ];
+            }
+
+            // 更新投注金额
+            $this->configService->updateConfig($config->id, [
+                'bet_amount' => $betAmount,
+            ]);
+
+            $message = $isCn
+                ? "✅ 投注金额已更新\n\n" .
+                  "新投注金额：{$betAmount} TRX\n" .
+                  "钱包地址：" . ($config->wallet_address ?: '未设置') . "\n" .
+                  "群组状态：" . ($config->status == 1 ? '✅ 启用' : '❌ 禁用')
+                : "✅ Bet amount updated\n\n" .
+                  "New Bet Amount: {$betAmount} TRX\n" .
+                  "Wallet Address: " . ($config->wallet_address ?: 'Not set') . "\n" .
+                  "Group Status: " . ($config->status == 1 ? '✅ Enabled' : '❌ Disabled');
+
+            return ['success' => true, 'message' => $message];
+
+        } catch (\Throwable $e) {
+            Log::error("设置投注金额失败", [
+                'chat_id' => $chatId,
+                'bet_amount' => $betAmount,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? "❌ 设置失败：" . $e->getMessage()
+                    : "❌ Setup failed: " . $e->getMessage(),
+            ];
+        }
     }
 
     /**

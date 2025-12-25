@@ -28,8 +28,8 @@ class TronTransactionMonitorProcess
     {
         Log::info("TronTransactionMonitorProcess: 进程启动");
 
-        // 每30秒检查一次TRON交易
-        new Crontab('*/30 * * * * *', function() {
+        // 每10秒检查一次TRON交易
+        new Crontab('*/10 * * * * *', function() {
             try {
                 $this->monitorTransactions();
             } catch (\Throwable $e) {
@@ -39,7 +39,7 @@ class TronTransactionMonitorProcess
             }
         });
 
-        Log::info("TronTransactionMonitorProcess: Crontab已设置 (每30秒执行一次)");
+        Log::info("TronTransactionMonitorProcess: Crontab已设置 (每10秒执行一次)");
     }
 
     /**

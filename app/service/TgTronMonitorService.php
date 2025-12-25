@@ -4,6 +4,7 @@ namespace app\service;
 
 use app\constants\TgTronTransactionLog as TxLogConst;
 use app\constants\TgGameGroupConfig as ConfigConst;
+use app\lib\helper\TelegramBotHelper;
 use app\repository\TgTronTransactionLogRepository;
 use app\repository\TgGameGroupConfigRepository;
 use app\repository\TgPlayerWalletBindingRepository;
@@ -194,6 +195,9 @@ class TgTronMonitorService extends BaseService
                 'matched' => $prizeResult['matched'] ?? false,
             ]);
 
+            // 发送Telegram投注成功通知
+            $this->sendBetSuccessNotification($config, $txData, $nodeResult, $binding);
+
             return [
                 'success' => true,
                 'message' => '交易处理成功',
@@ -284,5 +288,64 @@ class TgTronMonitorService extends BaseService
             'block_timestamp' => $txData['block_timestamp'] ?? time(),
             'status' => $txData['status'] ?? TxLogConst::TX_STATUS_SUCCESS,
         ]);
+    }
+
+    /**
+     * 发送投注成功通知到Telegram群组
+     */
+    protected function sendBetSuccessNotification($config, array $txData, array $nodeResult, $binding): void
+    {
+        try {
+            $amountTrx = \app\lib\helper\TronWebHelper::sunToTrx($txData['amount']);
+            $ticket = $nodeResult['ticket'] ?? '未知';
+            $ticketSerialNo = $nodeResult['ticket_serial_no'] ?? '未知';
+
+            // 构建通知消息
+            $message = "🎲 投注成功通知\n\n";
+            $message .= "━━━━━━━━━━━━━━━━━━━━\n";
+
+            // 如果有绑定信息，艾特该群友
+            if ($binding && $binding->tg_user_id) {
+                $userMention = $binding->tg_username
+                    ? "@{$binding->tg_username}"
+                    : "[User](tg://user?id={$binding->tg_user_id})";
+                $message .= "🎮 玩家：{$userMention}\n";
+            } else {
+                $message .= "🎮 玩家：未绑定（钱包：" . substr($txData['from_address'], 0, 8) . "..." . substr($txData['from_address'], -6) . "）\n";
+            }
+
+            $message .= "💰 投注金额：<b>{$amountTrx} TRX</b>\n";
+            $message .= "🎫 票号：<code>{$ticket}</code>\n";
+            $message .= "🔢 流水号：<code>{$ticketSerialNo}</code>\n";
+            $message .= "📝 交易哈希：<code>" . substr($txData['tx_hash'], 0, 10) . "..." . substr($txData['tx_hash'], -8) . "</code>\n";
+            $message .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+
+            // 如果玩家未绑定钱包，提示绑定
+            if (!$binding) {
+                $message .= "💡 提示：绑定钱包后可获得艾特通知\n";
+                $message .= "使用命令：<code>/绑定钱包 您的TRON地址</code>\n\n";
+            }
+
+            $message .= "🐍 当前蛇身长度：" . ($nodeResult['snake_length'] ?? '未知') . " 节\n";
+            $message .= "🎰 使用 /蛇身 查看当前蛇身状态";
+
+            // 发送到Telegram群组
+            TelegramBotHelper::send($config->tg_chat_id, $message);
+
+            Log::info("发送投注成功通知成功", [
+                'chat_id' => $config->tg_chat_id,
+                'tx_hash' => $txData['tx_hash'],
+                'has_binding' => $binding ? 'yes' : 'no',
+            ]);
+
+        } catch (\Throwable $e) {
+            Log::error("发送投注成功通知失败: " . $e->getMessage(), [
+                'chat_id' => $config->tg_chat_id ?? null,
+                'tx_hash' => $txData['tx_hash'] ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            // 通知发送失败不影响主流程，只记录日志
+        }
     }
 }
