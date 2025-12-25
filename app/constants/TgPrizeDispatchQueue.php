@@ -38,6 +38,7 @@ class TgPrizeDispatchQueue
 
     // 默认最大重试次数
     public const DEFAULT_MAX_RETRY = 3;
+    public const MAX_RETRY_COUNT = 3;  // 别名，用于进程中的重试检查
 
     // 任务超时时间（分钟）
     public const TASK_TIMEOUT_MINUTES = 10;

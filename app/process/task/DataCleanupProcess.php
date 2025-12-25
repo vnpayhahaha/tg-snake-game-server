@@ -4,12 +4,7 @@ namespace app\process\task;
 
 use app\constants\TgPrizeDispatchQueue as QueueConst;
 use app\constants\TgSnakeNode as NodeConst;
-use app\repository\TgPrizeDispatchQueueRepository;
-use app\repository\TgSnakeNodeRepository;
-use app\repository\TgTronTransactionLogRepository;
 use Carbon\Carbon;
-use DI\Attribute\Inject;
-use support\Container;
 use support\Db;
 use support\Log;
 use Workerman\Crontab\Crontab;
@@ -20,15 +15,6 @@ use Workerman\Crontab\Crontab;
  */
 class DataCleanupProcess
 {
-    #[Inject]
-    protected TgSnakeNodeRepository $nodeRepository;
-
-    #[Inject]
-    protected TgPrizeDispatchQueueRepository $queueRepository;
-
-    #[Inject]
-    protected TgTronTransactionLogRepository $txLogRepository;
-
     public function onWorkerStart(): void
     {
         Log::info("DataCleanupProcess: 进程启动");
@@ -88,8 +74,6 @@ class DataCleanupProcess
     protected function cleanupArchivedNodes(int $daysToKeep): int
     {
         try {
-            $nodeRepository = Container::get(TgSnakeNodeRepository::class);
-
             $cutoffDate = Carbon::now()->subDays($daysToKeep);
 
             $deleted = Db::table('tg_snake_node')
@@ -119,8 +103,6 @@ class DataCleanupProcess
     protected function cleanupCompletedQueueRecords(int $daysToKeep): int
     {
         try {
-            $queueRepository = Container::get(TgPrizeDispatchQueueRepository::class);
-
             $cutoffDate = Carbon::now()->subDays($daysToKeep);
 
             $deleted = Db::table('tg_prize_dispatch_queue')
@@ -150,8 +132,6 @@ class DataCleanupProcess
     protected function cleanupProcessedTransactionLogs(int $daysToKeep): int
     {
         try {
-            $txLogRepository = Container::get(TgTronTransactionLogRepository::class);
-
             $cutoffDate = Carbon::now()->subDays($daysToKeep);
 
             $deleted = Db::table('tg_tron_transaction_log')
@@ -181,8 +161,6 @@ class DataCleanupProcess
     protected function cleanupCancelledQueueRecords(int $daysToKeep): int
     {
         try {
-            $queueRepository = Container::get(TgPrizeDispatchQueueRepository::class);
-
             $cutoffDate = Carbon::now()->subDays($daysToKeep);
 
             $deleted = Db::table('tg_prize_dispatch_queue')

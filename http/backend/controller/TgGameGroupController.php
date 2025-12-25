@@ -147,7 +147,20 @@ class TgGameGroupController extends BasicController
     }
 
     /**
+     * 恢复回收站中的群组
+     * 必须在 /group/{id} 之前
+     */
+    #[PutMapping('/group/recovery')]
+    #[Permission(code: 'tg_game:group:recovery')]
+    #[OperationLog('恢复群组')]
+    public function recovery(Request $request): Response
+    {
+        return $this->service->recovery((array)$request->input('ids', [])) ? $this->success() : $this->error();
+    }
+
+    /**
      * 更新游戏群组
+     * 参数化路由，必须在静态路由之后
      */
     #[PutMapping('/group/{id}')]
     #[Permission(code: 'tg_game:group:update')]
@@ -172,17 +185,6 @@ class TgGameGroupController extends BasicController
         ));
 
         return $this->success();
-    }
-
-    /**
-     * 恢复回收站中的群组
-     */
-    #[PutMapping('/group/recovery')]
-    #[Permission(code: 'tg_game:group:recovery')]
-    #[OperationLog('恢复群组')]
-    public function recovery(Request $request): Response
-    {
-        return $this->service->recovery((array)$request->input('ids', [])) ? $this->success() : $this->error();
     }
 
     /**

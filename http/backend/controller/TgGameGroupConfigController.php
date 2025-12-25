@@ -236,7 +236,20 @@ class TgGameGroupConfigController extends BasicController
     }
 
     /**
+     * 恢复回收站中的配置
+     * 必须在 /config/{id} 之前
+     */
+    #[PutMapping('/config/recovery')]
+    #[Permission(code: 'tg_game:config:recovery')]
+    #[OperationLog('恢复配置')]
+    public function recovery(Request $request): Response
+    {
+        return $this->service->recovery((array)$request->input('ids', [])) ? $this->success() : $this->error();
+    }
+
+    /**
      * 更新群组配置
+     * 参数化路由，必须在静态路由之后
      */
     #[PutMapping('/config/{id}')]
     #[Permission(code: 'tg_game:config:update')]
@@ -288,17 +301,6 @@ class TgGameGroupConfigController extends BasicController
         ), 1); // 来源：管理后台
 
         return $this->success();
-    }
-
-    /**
-     * 恢复回收站中的配置
-     */
-    #[PutMapping('/config/recovery')]
-    #[Permission(code: 'tg_game:config:recovery')]
-    #[OperationLog('恢复配置')]
-    public function recovery(Request $request): Response
-    {
-        return $this->service->recovery((array)$request->input('ids', [])) ? $this->success() : $this->error();
     }
 
     /**

@@ -6,8 +6,6 @@ use app\constants\TgPrizeDispatchQueue as QueueConst;
 use app\repository\TgPrizeDispatchQueueRepository;
 use app\service\TgPrizeTransferService;
 use DI\Attribute\Inject;
-use support\Container;
-use support\Db;
 use support\Log;
 use Workerman\Crontab\Crontab;
 
@@ -68,11 +66,8 @@ class PrizeDispatchQueueProcess
      */
     protected function processPendingTasks(): void
     {
-        $queueRepository = Container::get(TgPrizeDispatchQueueRepository::class);
-        $transferService = Container::get(TgPrizeTransferService::class);
-
         // 获取待处理的任务（按优先级排序）
-        $tasks = $queueRepository->getPendingTasks(10);
+        $tasks = $this->queueRepository->getPendingTasks(10);
 
         if ($tasks->isEmpty()) {
             Log::debug("PrizeDispatchQueueProcess: 没有待处理的任务");
@@ -84,7 +79,7 @@ class PrizeDispatchQueueProcess
         foreach ($tasks as $task) {
             try {
                 // 使用乐观锁标记为处理中
-                $updated = $queueRepository->updateWithVersion($task->id, [
+                $updated = $this->queueRepository->updateWithVersion($task->id, [
                     'status' => QueueConst::STATUS_PROCESSING,
                     'process_start_time' => now(),
                     'retry_count' => $task->retry_count + 1,
@@ -96,7 +91,7 @@ class PrizeDispatchQueueProcess
                 }
 
                 // 执行转账
-                $result = $transferService->executeTransfer(
+                $result = $this->transferService->executeTransfer(
                     $task->prize_record_id,
                     $task->winner_address,
                     $task->transfer_amount
@@ -104,7 +99,7 @@ class PrizeDispatchQueueProcess
 
                 if ($result['success']) {
                     // 转账成功，标记为完成
-                    $queueRepository->updateById($task->id, [
+                    $this->queueRepository->updateById($task->id, [
                         'status' => QueueConst::STATUS_COMPLETED,
                         'process_end_time' => now(),
                         'tx_hash' => $result['tx_hash'] ?? null,
@@ -119,7 +114,7 @@ class PrizeDispatchQueueProcess
                     ]);
                 } else {
                     // 转账失败，标记为失败
-                    $queueRepository->updateById($task->id, [
+                    $this->queueRepository->updateById($task->id, [
                         'status' => QueueConst::STATUS_FAILED,
                         'process_end_time' => now(),
                         'error_message' => $result['message'] ?? '转账失败',
@@ -138,7 +133,7 @@ class PrizeDispatchQueueProcess
                 ]);
 
                 // 标记为失败
-                $queueRepository->updateById($task->id, [
+                $this->queueRepository->updateById($task->id, [
                     'status' => QueueConst::STATUS_FAILED,
                     'process_end_time' => now(),
                     'error_message' => $e->getMessage(),
@@ -154,11 +149,9 @@ class PrizeDispatchQueueProcess
      */
     protected function handleTimeoutTasks(): void
     {
-        $queueRepository = Container::get(TgPrizeDispatchQueueRepository::class);
-
         // 查找超时任务（处理中超过5分钟）
         $timeoutMinutes = 5;
-        $tasks = $queueRepository->getTimeoutTasks($timeoutMinutes);
+        $tasks = $this->queueRepository->getTimeoutTasks($timeoutMinutes);
 
         if ($tasks->isEmpty()) {
             return;
@@ -169,7 +162,7 @@ class PrizeDispatchQueueProcess
         foreach ($tasks as $task) {
             try {
                 // 重置为待处理状态，增加重试次数
-                $queueRepository->updateById($task->id, [
+                $this->queueRepository->updateById($task->id, [
                     'status' => QueueConst::STATUS_PENDING,
                     'process_start_time' => null,
                     'error_message' => "任务超时，已重置为待处理",
@@ -188,10 +181,8 @@ class PrizeDispatchQueueProcess
      */
     protected function retryFailedTasks(): void
     {
-        $queueRepository = Container::get(TgPrizeDispatchQueueRepository::class);
-
         // 获取可重试的失败任务
-        $tasks = $queueRepository->getRetryableTasks(5);
+        $tasks = $this->queueRepository->getRetryableTasks(5);
 
         if ($tasks->isEmpty()) {
             return;
@@ -201,18 +192,18 @@ class PrizeDispatchQueueProcess
 
         foreach ($tasks as $task) {
             try {
-                // 检查是否超过最大重试次数
-                if ($task->retry_count >= QueueConst::MAX_RETRY_COUNT) {
-                    Log::warning("任务 {$task->id} 已达到最大重试次数，标记为取消");
-                    $queueRepository->updateById($task->id, [
+                // 检查是否超过最大重试次数（使用任务自己的max_retry字段）
+                if ($task->retry_count >= $task->max_retry) {
+                    Log::warning("任务 {$task->id} 已达到最大重试次数($task->max_retry)，标记为取消");
+                    $this->queueRepository->updateById($task->id, [
                         'status' => QueueConst::STATUS_CANCELLED,
-                        'error_message' => "超过最大重试次数",
+                        'error_message' => "超过最大重试次数($task->max_retry)",
                     ]);
                     continue;
                 }
 
                 // 重置为待处理状态
-                $queueRepository->updateById($task->id, [
+                $this->queueRepository->updateById($task->id, [
                     'status' => QueueConst::STATUS_PENDING,
                     'process_start_time' => null,
                 ]);

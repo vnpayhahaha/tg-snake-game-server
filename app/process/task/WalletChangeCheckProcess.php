@@ -7,7 +7,6 @@ use app\repository\TgGameGroupConfigRepository;
 use app\service\TgGameGroupConfigService;
 use Carbon\Carbon;
 use DI\Attribute\Inject;
-use support\Container;
 use support\Log;
 use Workerman\Crontab\Crontab;
 
@@ -46,11 +45,8 @@ class WalletChangeCheckProcess
      */
     protected function checkWalletChanges(): void
     {
-        $configRepository = Container::get(TgGameGroupConfigRepository::class);
-        $configService = Container::get(TgGameGroupConfigService::class);
-
         // 获取所有正在变更中的配置
-        $changingConfigs = $configRepository->getChangingConfigs();
+        $changingConfigs = $this->configRepository->getChangingConfigs();
 
         if ($changingConfigs->isEmpty()) {
             Log::debug("WalletChangeCheckProcess: 没有正在变更的钱包");
@@ -61,7 +57,7 @@ class WalletChangeCheckProcess
 
         foreach ($changingConfigs as $config) {
             try {
-                $this->checkSingleWalletChange($config, $configService);
+                $this->checkSingleWalletChange($config);
             } catch (\Throwable $e) {
                 Log::error("检查群组 {$config->id} 钱包变更失败: " . $e->getMessage(), [
                     'group_id' => $config->id,
@@ -77,7 +73,7 @@ class WalletChangeCheckProcess
     /**
      * 检查单个钱包变更
      */
-    protected function checkSingleWalletChange($config, $configService): void
+    protected function checkSingleWalletChange($config): void
     {
         // 检查是否到达结束时间
         $now = Carbon::now();
@@ -100,7 +96,7 @@ class WalletChangeCheckProcess
             'wallet_change_count' => $config->wallet_change_count,
         ]);
 
-        $result = $configService->completeWalletChange($config->id);
+        $result = $this->configService->completeWalletChange($config->id);
 
         if ($result['success']) {
             Log::info("钱包变更完成", [

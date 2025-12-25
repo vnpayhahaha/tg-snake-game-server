@@ -132,6 +132,22 @@ class TgPrizeDispatchQueueRepository extends IRepository
     }
 
     /**
+     * 使用乐观锁更新任务（通用方法）
+     */
+    public function updateWithVersion(int $id, array $data, int $currentVersion): bool
+    {
+        // 自动增加版本号
+        $data['version'] = $currentVersion + 1;
+
+        $affected = $this->model::query()
+            ->where('id', $id)
+            ->where('version', $currentVersion)
+            ->update($data);
+
+        return $affected > 0;
+    }
+
+    /**
      * 完成任务
      */
     public function completeTask(int $id): bool
@@ -251,6 +267,22 @@ class TgPrizeDispatchQueueRepository extends IRepository
             ->where('status', QueueConst::STATUS_PROCESSING)
             ->where('started_at', '<', now()->subMinutes($timeoutMinutes))
             ->get();
+    }
+
+    /**
+     * 获取超时任务（别名）
+     */
+    public function getTimeoutTasks(int $timeoutMinutes = 10): Collection
+    {
+        return $this->getTimeoutProcessingTasks($timeoutMinutes);
+    }
+
+    /**
+     * 获取可重试的失败任务（别名）
+     */
+    public function getRetryableTasks(int $limit = 50): Collection
+    {
+        return $this->getFailedTasksForRetry($limit);
     }
 
     /**

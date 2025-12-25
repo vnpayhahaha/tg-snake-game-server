@@ -5,7 +5,6 @@ namespace app\process\task;
 use app\service\TgGameGroupConfigService;
 use app\service\TgTronMonitorService;
 use DI\Attribute\Inject;
-use support\Container;
 use support\Log;
 use Workerman\Crontab\Crontab;
 
@@ -44,11 +43,8 @@ class TronTransactionMonitorProcess
      */
     protected function monitorTransactions(): void
     {
-        $configService = Container::get(TgGameGroupConfigService::class);
-        $monitorService = Container::get(TgTronMonitorService::class);
-
         // 获取所有活跃配置
-        $activeConfigs = $configService->getActiveConfigs();
+        $activeConfigs = $this->configService->getActiveConfigs();
 
         if ($activeConfigs->isEmpty()) {
             Log::debug("TronTransactionMonitorProcess: 没有活跃的群组配置");
@@ -59,7 +55,7 @@ class TronTransactionMonitorProcess
 
         foreach ($activeConfigs as $config) {
             try {
-                $this->monitorGroupTransactions($config, $monitorService);
+                $this->monitorGroupTransactions($config);
             } catch (\Throwable $e) {
                 Log::error("监控群组 {$config->id} 交易失败: " . $e->getMessage(), [
                     'group_id' => $config->id,
@@ -74,12 +70,12 @@ class TronTransactionMonitorProcess
     /**
      * 监控单个群组的交易
      */
-    protected function monitorGroupTransactions($config, $monitorService): void
+    protected function monitorGroupTransactions($config): void
     {
         // TODO: 这里需要调用TRON API获取最新交易
         // 示例伪代码：
         // 1. 获取上次检查的区块高度
-        $lastBlockHeight = $monitorService->getLatestBlockHeight($config->id) ?? 0;
+        $lastBlockHeight = $this->monitorService->getLatestBlockHeight($config->id) ?? 0;
 
         // 2. 调用TRON API查询该地址的新交易（需要实现TronWebHelper）
         // $tronHelper = Container::get(TronWebHelper::class);
@@ -91,7 +87,7 @@ class TronTransactionMonitorProcess
         // 3. 处理每笔入账交易
         // foreach ($transactions as $tx) {
         //     if ($tx['type'] === 'incoming') {
-        //         $result = $monitorService->processIncomingTransaction($config->id, [
+        //         $result = $this->monitorService->processIncomingTransaction($config->id, [
         //             'tx_hash' => $tx['tx_hash'],
         //             'from_address' => $tx['from'],
         //             'to_address' => $tx['to'],
@@ -123,14 +119,11 @@ class TronTransactionMonitorProcess
      */
     protected function processUnprocessedTransactions(): void
     {
-        $configService = Container::get(TgGameGroupConfigService::class);
-        $monitorService = Container::get(TgTronMonitorService::class);
-
-        $activeConfigs = $configService->getActiveConfigs();
+        $activeConfigs = $this->configService->getActiveConfigs();
 
         foreach ($activeConfigs as $config) {
             try {
-                $result = $monitorService->processUnprocessedTransactions($config->id, 100);
+                $result = $this->monitorService->processUnprocessedTransactions($config->id, 100);
                 if ($result['total'] > 0) {
                     Log::info("处理未处理交易", [
                         'group_id' => $config->id,

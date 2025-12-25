@@ -75,5 +75,22 @@ return [
     // ChannelAccountDailyStatsCrontab
     'ChannelAccountDailyStatsCrontab' => [
         'handler' => app\process\task\ChannelAccountDailyStatsCrontab::class
+    ],
+    // TG Snake Game Processes
+    'TronTransactionMonitorProcess'   => [
+        'handler' => app\process\task\TronTransactionMonitorProcess::class,
+        'count'   => 1,
+    ],
+    'PrizeDispatchQueueProcess'       => [
+        'handler' => app\process\task\PrizeDispatchQueueProcess::class,
+        'count'   => 1,
+    ],
+    'WalletChangeCheckProcess'        => [
+        'handler' => app\process\task\WalletChangeCheckProcess::class,
+        'count'   => 1,
+    ],
+    'DataCleanupProcess'              => [
+        'handler' => app\process\task\DataCleanupProcess::class,
+        'count'   => 1,
     ]
 ];

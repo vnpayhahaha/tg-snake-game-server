@@ -262,7 +262,20 @@ class TgPlayerWalletBindingController extends BasicController
     }
 
     /**
+     * 恢复回收站中的绑定
+     * 必须在 /wallet_binding/{id} 之前
+     */
+    #[PutMapping('/wallet_binding/recovery')]
+    #[Permission(code: 'tg_game:wallet_binding:recovery')]
+    #[OperationLog('恢复绑定记录')]
+    public function recovery(Request $request): Response
+    {
+        return $this->service->recovery((array)$request->input('ids', [])) ? $this->success() : $this->error();
+    }
+
+    /**
      * 更新绑定信息
+     * 参数化路由，必须在静态路由之后
      */
     #[PutMapping('/wallet_binding/{id}')]
     #[Permission(code: 'tg_game:wallet_binding:update')]
@@ -282,17 +295,6 @@ class TgPlayerWalletBindingController extends BasicController
         $this->service->updateById($id, $validatedData);
 
         return $this->success();
-    }
-
-    /**
-     * 恢复回收站中的绑定
-     */
-    #[PutMapping('/wallet_binding/recovery')]
-    #[Permission(code: 'tg_game:wallet_binding:recovery')]
-    #[OperationLog('恢复绑定记录')]
-    public function recovery(Request $request): Response
-    {
-        return $this->service->recovery((array)$request->input('ids', [])) ? $this->success() : $this->error();
     }
 
     /**
