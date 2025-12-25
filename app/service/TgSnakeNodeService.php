@@ -68,9 +68,9 @@ class TgSnakeNodeService extends BaseService
                 throw new \Exception('群组配置不存在');
             }
 
-            // 验证金额是否达到最小投注金额
-            if ($data['amount'] < $config->min_bet_amount) {
-                throw new \Exception("投注金额不足最小金额: {$config->min_bet_amount} TRX");
+            // 验证金额是否达到固定投注金额
+            if ($data['amount'] != $config->bet_amount) {
+                throw new \Exception("投注金额必须为固定金额: {$config->bet_amount} TRX");
             }
 
             // 提取凭证号

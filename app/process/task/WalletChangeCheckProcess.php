@@ -129,7 +129,7 @@ class WalletChangeCheckProcess
     {
         try {
             $message = "🔄 钱包变更完成通知\n\n" .
-                      "群组：{$config->tg_group_name}\n" .
+                      "群组：{$config->tg_chat_title}\n" .
                       "新钱包地址：{$result['new_address']}\n" .
                       "钱包周期：#{$result['new_wallet_cycle']}\n" .
                       "归档节点数：{$result['archived_nodes']}\n\n" .

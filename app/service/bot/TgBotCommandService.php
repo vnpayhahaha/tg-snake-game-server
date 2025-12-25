@@ -151,41 +151,100 @@ class TgBotCommandService
             ];
         }
 
+        // 计算平台手续费率（转换为百分比）
+        $platformFeePercent = round($config->platform_fee_rate * 100, 2);
+        // 计算玩家实际可得奖金比例
+        $playerPrizePercent = round((1 - $config->platform_fee_rate) * 100, 2);
+
         $text = $isCn
             ? "🐍 贪吃蛇链上游戏规则\n\n" .
-              "【游戏机制】\n" .
-              "• 最小投注：{$config->min_bet_amount} TRX\n" .
-              "• 匹配位数：{$config->prize_match_count}\n" .
-              "• 蛇头票号：{$config->snake_head_ticket}\n\n" .
-              "【中奖规则】\n" .
-              "• 完全匹配（Jackpot）：蛇头与蛇身任意节点完全匹配\n" .
-              "• 范围匹配：蛇头与蛇身节点部分匹配（前N位）\n\n" .
-              "【奖金分配】\n" .
-              "• Jackpot：{$config->prize_ratio_jackpot}%\n" .
-              "• 范围匹配：{$config->prize_ratio_range_match}%\n" .
-              "• 平台费：{$config->prize_ratio_platform}%\n\n" .
-              "【参与方式】\n" .
-              "1. 绑定钱包：/bind_wallet YOUR_ADDRESS\n" .
-              "2. 向群组钱包转账参与游戏\n" .
-              "3. 等待区块确认并生成票号\n" .
-              "4. 系统自动检测中奖并派发奖金"
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【💰 投注要求】\n" .
+              "• 固定投注金额：<b>{$config->bet_amount} TRX</b>\n" .
+              "• 收款钱包：<code>{$config->wallet_address}</code>\n" .
+              "• 必须使用已绑定的钱包地址转账\n" .
+              "• 转账金额必须完全匹配（不多不少）\n\n" .
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【🎮 游戏机制】\n" .
+              "1️⃣ 每笔有效转账生成一个「票号」\n" .
+              "2️⃣ 票号从交易哈希中提取（取哈希末尾数字）\n" .
+              "3️⃣ 所有票号按时间顺序组成「蛇身」\n" .
+              "4️⃣ 最新的票号称为「蛇头」\n" .
+              "5️⃣ 当蛇头与蛇身中任意节点匹配时触发中奖\n\n" .
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【🏆 中奖规则】\n" .
+              "• <b>完全匹配（Jackpot）</b>：蛇头与蛇身某节点完全相同\n" .
+              "  → 获得当前奖池所有金额\n" .
+              "• <b>部分匹配（范围奖）</b>：蛇头与蛇身某节点部分相同\n" .
+              "  → 获得固定金额奖励\n\n" .
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【💵 奖金分配】\n" .
+              "• 平台手续费：<b>{$platformFeePercent}%</b>\n" .
+              "• 玩家奖金池：<b>{$playerPrizePercent}%</b>\n" .
+              "• 手续费从每笔投注中扣除\n" .
+              "• 剩余金额进入奖池累积\n" .
+              "• 中奖时自动转账到绑定钱包\n\n" .
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【📝 参与步骤】\n" .
+              "1️⃣ 绑定钱包：<code>/bind_wallet 您的TRON地址</code>\n" .
+              "2️⃣ 查看收款地址：<code>/address</code>\n" .
+              "3️⃣ 转账 {$config->bet_amount} TRX 到群组钱包\n" .
+              "4️⃣ 等待区块确认（约1分钟）\n" .
+              "5️⃣ 系统自动生成票号并检测中奖\n" .
+              "6️⃣ 中奖后自动转账到您的钱包\n\n" .
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【⚠️ 重要提示】\n" .
+              "• 必须先绑定钱包才能参与游戏\n" .
+              "• 转账金额必须精确为 {$config->bet_amount} TRX\n" .
+              "• 只能从绑定的钱包地址转账\n" .
+              "• 转账到其他地址无效\n" .
+              "• 请勿重复转账，每笔都会计入\n\n" .
+              "💡 使用 <code>/help</code> 查看所有命令\n" .
+              "💡 使用 <code>/snake</code> 查看当前蛇身状态"
             : "🐍 Snake Chain Game Rules\n\n" .
-              "【Game Mechanics】\n" .
-              "• Min Bet: {$config->min_bet_amount} TRX\n" .
-              "• Match Digits: {$config->prize_match_count}\n" .
-              "• Snake Head Ticket: {$config->snake_head_ticket}\n\n" .
-              "【Winning Rules】\n" .
-              "• Perfect Match (Jackpot): Snake head completely matches any body node\n" .
-              "• Range Match: Snake head partially matches body nodes (first N digits)\n\n" .
-              "【Prize Distribution】\n" .
-              "• Jackpot: {$config->prize_ratio_jackpot}%\n" .
-              "• Range Match: {$config->prize_ratio_range_match}%\n" .
-              "• Platform Fee: {$config->prize_ratio_platform}%\n\n" .
-              "【How to Participate】\n" .
-              "1. Bind wallet: /bind_wallet YOUR_ADDRESS\n" .
-              "2. Transfer TRX to group wallet\n" .
-              "3. Wait for block confirmation and ticket generation\n" .
-              "4. System automatically detects wins and distributes prizes";
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【💰 Bet Requirements】\n" .
+              "• Fixed Bet Amount: <b>{$config->bet_amount} TRX</b>\n" .
+              "• Wallet Address: <code>{$config->wallet_address}</code>\n" .
+              "• Must use a bound wallet address\n" .
+              "• Transfer amount must be exact (not more or less)\n\n" .
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【🎮 Game Mechanics】\n" .
+              "1️⃣ Each valid transfer generates a 'ticket number'\n" .
+              "2️⃣ Ticket number extracted from transaction hash (last digits)\n" .
+              "3️⃣ All tickets form the 'snake body' in chronological order\n" .
+              "4️⃣ The latest ticket is called the 'snake head'\n" .
+              "5️⃣ Prize triggered when head matches any body node\n\n" .
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【🏆 Winning Rules】\n" .
+              "• <b>Perfect Match (Jackpot)</b>: Head completely matches a body node\n" .
+              "  → Win entire current prize pool\n" .
+              "• <b>Partial Match (Range Prize)</b>: Head partially matches a body node\n" .
+              "  → Win fixed prize amount\n\n" .
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【💵 Prize Distribution】\n" .
+              "• Platform Fee: <b>{$platformFeePercent}%</b>\n" .
+              "• Player Prize Pool: <b>{$playerPrizePercent}%</b>\n" .
+              "• Fee deducted from each bet\n" .
+              "• Remaining amount added to prize pool\n" .
+              "• Winners receive automatic transfer to bound wallet\n\n" .
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【📝 How to Participate】\n" .
+              "1️⃣ Bind wallet: <code>/bind_wallet YOUR_TRON_ADDRESS</code>\n" .
+              "2️⃣ Check wallet address: <code>/address</code>\n" .
+              "3️⃣ Transfer {$config->bet_amount} TRX to group wallet\n" .
+              "4️⃣ Wait for block confirmation (~1 minute)\n" .
+              "5️⃣ System auto-generates ticket and checks for wins\n" .
+              "6️⃣ Auto-transfer to your wallet if you win\n\n" .
+              "━━━━━━━━━━━━━━━━━━━━\n" .
+              "【⚠️ Important Notes】\n" .
+              "• Must bind wallet before participating\n" .
+              "• Transfer amount must be exactly {$config->bet_amount} TRX\n" .
+              "• Only transfers from bound wallet are valid\n" .
+              "• Transfers to other addresses are invalid\n" .
+              "• Avoid duplicate transfers, each counts\n\n" .
+              "💡 Use <code>/help</code> to see all commands\n" .
+              "💡 Use <code>/snake</code> to view current snake status";
 
         return ['success' => true, 'message' => $text];
     }
@@ -214,14 +273,17 @@ class TgBotCommandService
         $snake = $this->groupService->getCurrentSnake($group->id);
         $snakeCount = count($snake);
 
+        // 获取蛇头票号（最新的节点）
+        $snakeHeadTicket = !empty($snake) ? $snake[0]['ticket'] : '暂无';
+
         $text = $isCn
             ? "🐍 当前蛇身状态\n\n" .
               "蛇身长度：{$snakeCount} 节\n" .
-              "蛇头票号：{$config->snake_head_ticket}\n\n" .
+              "蛇头票号：{$snakeHeadTicket}\n\n" .
               "最近节点（最多显示10个）：\n"
             : "🐍 Current Snake Status\n\n" .
               "Snake Length: {$snakeCount} nodes\n" .
-              "Snake Head Ticket: {$config->snake_head_ticket}\n\n" .
+              "Snake Head Ticket: {$snakeHeadTicket}\n\n" .
               "Recent Nodes (max 10):\n";
 
         $recentNodes = array_slice($snake, 0, 10);
@@ -725,21 +787,24 @@ class TgBotCommandService
             ];
         }
 
+        // 计算平台手续费率（转换为百分比）
+        $platformFeePercent = round($config->platform_fee_rate * 100, 2);
+
         $text = $isCn
             ? "⚙️ 群组配置\n\n" .
-              "群组名称：{$config->tg_group_name}\n" .
+              "群组名称：{$config->tg_chat_title}\n" .
               "钱包地址：{$config->wallet_address}\n" .
-              "最小投注：{$config->min_bet_amount} TRX\n" .
-              "匹配位数：{$config->prize_match_count}\n" .
-              "蛇头票号：{$config->snake_head_ticket}\n" .
-              "状态：" . ($config->status == 1 ? '启用' : '禁用')
+              "固定投注金额：{$config->bet_amount} TRX\n" .
+              "平台手续费率：{$platformFeePercent}%\n" .
+              "钱包周期：第 {$config->wallet_change_count} 期\n" .
+              "状态：" . ($config->status == 1 ? '✅ 启用' : '❌ 禁用')
             : "⚙️ Group Configuration\n\n" .
-              "Group Name: {$config->tg_group_name}\n" .
+              "Group Name: {$config->tg_chat_title}\n" .
               "Wallet Address: {$config->wallet_address}\n" .
-              "Min Bet: {$config->min_bet_amount} TRX\n" .
-              "Match Digits: {$config->prize_match_count}\n" .
-              "Snake Head Ticket: {$config->snake_head_ticket}\n" .
-              "Status: " . ($config->status == 1 ? 'Enabled' : 'Disabled');
+              "Fixed Bet Amount: {$config->bet_amount} TRX\n" .
+              "Platform Fee Rate: {$platformFeePercent}%\n" .
+              "Wallet Cycle: #{$config->wallet_change_count}\n" .
+              "Status: " . ($config->status == 1 ? '✅ Enabled' : '❌ Disabled');
 
         return ['success' => true, 'message' => $text];
     }

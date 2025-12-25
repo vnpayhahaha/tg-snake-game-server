@@ -3,6 +3,7 @@
 namespace app\service;
 
 use app\constants\TgTronTransactionLog as TxLogConst;
+use app\constants\TgGameGroupConfig as ConfigConst;
 use app\repository\TgTronTransactionLogRepository;
 use app\repository\TgGameGroupConfigRepository;
 use app\repository\TgPlayerWalletBindingRepository;
@@ -66,11 +67,11 @@ class TgTronMonitorService extends BaseService
      */
     public function validateTransaction(array $txData, $config): array
     {
-        // 1. 检查交易金额是否达到最小投注金额
-        if ($txData['amount'] < $config->min_bet_amount) {
+        // 1. 检查交易金额是否为固定投注金额
+        if ($txData['amount'] != $config->bet_amount) {
             return [
                 'valid' => false,
-                'reason' => "交易金额不足最小投注金额: {$config->min_bet_amount} TRX",
+                'reason' => "交易金额必须为固定金额: {$config->bet_amount} TRX (实际: {$txData['amount']} TRX)",
             ];
         }
 
