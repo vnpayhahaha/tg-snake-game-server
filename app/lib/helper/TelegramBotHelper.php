@@ -235,9 +235,23 @@ class TelegramBotHelper
             ]);
 
             $data = json_decode($response->getBody()->getContents(), true);
+
+            if (!$data['ok']) {
+                Log::warning("获取Telegram聊天成员信息失败", [
+                    'chat_id' => $chatId,
+                    'user_id' => $userId,
+                    'error_code' => $data['error_code'] ?? null,
+                    'description' => $data['description'] ?? 'Unknown error',
+                ]);
+            }
+
             return $data['ok'] ? $data['result'] : null;
         } catch (\Throwable $e) {
-            Log::error("获取Telegram聊天成员信息异常: " . $e->getMessage());
+            Log::error("获取Telegram聊天成员信息异常: " . $e->getMessage(), [
+                'chat_id' => $chatId,
+                'user_id' => $userId,
+                'trace' => $e->getTraceAsString(),
+            ]);
             return null;
         }
     }
@@ -250,13 +264,57 @@ class TelegramBotHelper
      */
     public function isAdmin($chatId, int $userId): bool
     {
+        // 优先检查数据库中的管理员白名单
+        try {
+            $config = \app\model\ModelTgGameGroupConfig::where('tg_chat_id', $chatId)->first();
+            if ($config && $config->isInAdminWhitelist($userId)) {
+                Log::info("通过数据库管理员白名单验证", [
+                    'chat_id' => $chatId,
+                    'user_id' => $userId,
+                ]);
+                return true;
+            }
+        } catch (\Throwable $e) {
+            Log::warning("查询数据库白名单失败: " . $e->getMessage(), [
+                'chat_id' => $chatId,
+                'user_id' => $userId,
+            ]);
+        }
+
+        // 降级：检查配置文件中的全局管理员白名单（兼容旧配置）
+        $globalAdminWhitelist = config('app.telegram_admin_whitelist', []);
+        if (!empty($globalAdminWhitelist) && in_array($userId, $globalAdminWhitelist, true)) {
+            Log::info("通过全局管理员白名单验证", [
+                'chat_id' => $chatId,
+                'user_id' => $userId,
+            ]);
+            return true;
+        }
+
+        // 通过Telegram API验证
         $member = $this->getChatMember($chatId, $userId);
         if (!$member) {
+            Log::warning("无法获取成员信息，权限验证失败", [
+                'chat_id' => $chatId,
+                'user_id' => $userId,
+                'hint' => 'Bot可能没有管理员权限',
+                'solution_1' => '方案1：在Telegram群组中将Bot设置为管理员',
+                'solution_2' => '方案2：执行 /add_admin 命令添加白名单',
+            ]);
             return false;
         }
 
         $status = $member['status'] ?? '';
-        return in_array($status, ['creator', 'administrator'], true);
+        $isAdmin = in_array($status, ['creator', 'administrator'], true);
+
+        Log::debug("管理员权限检查", [
+            'chat_id' => $chatId,
+            'user_id' => $userId,
+            'status' => $status,
+            'is_admin' => $isAdmin,
+        ]);
+
+        return $isAdmin;
     }
 
     /**

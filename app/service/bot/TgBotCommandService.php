@@ -90,6 +90,10 @@ class TgBotCommandService
                 'BindTenant', 'cnBindTenant' => $this->handleBindTenant($chatId, $userId, $params, $command === 'cnBindTenant'),
                 'SetWallet', 'cnSetWallet' => $this->handleSetWallet($chatId, $userId, $params, $command === 'cnSetWallet'),
                 'SetBetAmount', 'cnSetBetAmount' => $this->handleSetBetAmount($chatId, $userId, $params, $command === 'cnSetBetAmount'),
+                // 管理员白名单管理
+                'AddAdmin', 'cnAddAdmin' => $this->handleAddAdmin($chatId, $userId, $params, $messageData, $command === 'cnAddAdmin'),
+                'RemoveAdmin', 'cnRemoveAdmin' => $this->handleRemoveAdmin($chatId, $userId, $params, $messageData, $command === 'cnRemoveAdmin'),
+                'ListAdmins', 'cnListAdmins' => $this->handleListAdmins($chatId, $userId, $command === 'cnListAdmins'),
                 default => $this->handleUnknown(str_starts_with($command, 'cn')),
             };
         } catch (\Throwable $e) {
@@ -1114,6 +1118,249 @@ class TgBotCommandService
                 'message' => $isCn
                     ? "❌ 设置失败：" . $e->getMessage()
                     : "❌ Setup failed: " . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 添加管理员到白名单命令（管理员专用）
+     */
+    protected function handleAddAdmin(int $chatId, int $userId, array $params, array $messageData, bool $isCn): array
+    {
+        // 验证管理员权限
+        if (!TelegramBotHelper::checkAdmin($chatId, $userId)) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '❌ 只有管理员可以执行此操作' : '❌ Only administrators can perform this action',
+            ];
+        }
+
+        try {
+            // 获取群组配置
+            $config = $this->configService->getByTgChatId($chatId);
+            if (!$config) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "❌ 群组未配置，请先执行：/绑定租户 租户ID"
+                        : "❌ Group not configured, please first execute: /bind_tenant TENANT_ID",
+                ];
+            }
+
+            // 获取目标用户ID
+            $targetUserId = null;
+
+            // 方式1：通过回复消息获取用户ID
+            if (!empty($messageData['reply_to_message'])) {
+                $targetUserId = $messageData['reply_to_message']['from']['id'] ?? null;
+            }
+            // 方式2：通过用户ID参数
+            elseif (!empty($params[0])) {
+                $targetUserId = intval($params[0]);
+            }
+
+            if (!$targetUserId) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "❌ 请提供用户ID或回复用户消息\n用法1：/添加管理 用户ID\n用法2：回复用户消息后执行 /添加管理"
+                        : "❌ Please provide user ID or reply to user message\nUsage 1: /add_admin USER_ID\nUsage 2: Reply to user message and execute /add_admin",
+                ];
+            }
+
+            // 添加到白名单
+            if (!$config->addAdminToWhitelist($targetUserId)) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "⚠️ 用户已在管理员白名单中\n用户ID：{$targetUserId}"
+                        : "⚠️ User already in admin whitelist\nUser ID: {$targetUserId}",
+                ];
+            }
+
+            // 保存到数据库
+            $config->save();
+
+            $message = $isCn
+                ? "✅ 已添加到管理员白名单\n\n" .
+                  "用户ID：<code>{$targetUserId}</code>\n" .
+                  "当前白名单人数：" . count($config->getAdminWhitelistArray()) . " 人\n\n" .
+                  "💡 该用户现在可以使用所有管理员命令"
+                : "✅ Added to admin whitelist\n\n" .
+                  "User ID: <code>{$targetUserId}</code>\n" .
+                  "Current whitelist count: " . count($config->getAdminWhitelistArray()) . " users\n\n" .
+                  "💡 This user can now use all admin commands";
+
+            return ['success' => true, 'message' => $message];
+
+        } catch (\Throwable $e) {
+            Log::error("添加管理员白名单失败", [
+                'chat_id' => $chatId,
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? "❌ 操作失败：" . $e->getMessage()
+                    : "❌ Operation failed: " . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 从白名单移除管理员命令（管理员专用）
+     */
+    protected function handleRemoveAdmin(int $chatId, int $userId, array $params, array $messageData, bool $isCn): array
+    {
+        // 验证管理员权限
+        if (!TelegramBotHelper::checkAdmin($chatId, $userId)) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '❌ 只有管理员可以执行此操作' : '❌ Only administrators can perform this action',
+            ];
+        }
+
+        try {
+            // 获取群组配置
+            $config = $this->configService->getByTgChatId($chatId);
+            if (!$config) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "❌ 群组未配置"
+                        : "❌ Group not configured",
+                ];
+            }
+
+            // 获取目标用户ID
+            $targetUserId = null;
+
+            // 方式1：通过回复消息获取用户ID
+            if (!empty($messageData['reply_to_message'])) {
+                $targetUserId = $messageData['reply_to_message']['from']['id'] ?? null;
+            }
+            // 方式2：通过用户ID参数
+            elseif (!empty($params[0])) {
+                $targetUserId = intval($params[0]);
+            }
+
+            if (!$targetUserId) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "❌ 请提供用户ID或回复用户消息\n用法1：/移除管理 用户ID\n用法2：回复用户消息后执行 /移除管理"
+                        : "❌ Please provide user ID or reply to user message\nUsage 1: /remove_admin USER_ID\nUsage 2: Reply to user message and execute /remove_admin",
+                ];
+            }
+
+            // 从白名单移除
+            if (!$config->removeAdminFromWhitelist($targetUserId)) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "⚠️ 用户不在管理员白名单中\n用户ID：{$targetUserId}"
+                        : "⚠️ User not in admin whitelist\nUser ID: {$targetUserId}",
+                ];
+            }
+
+            // 保存到数据库
+            $config->save();
+
+            $message = $isCn
+                ? "✅ 已从管理员白名单移除\n\n" .
+                  "用户ID：<code>{$targetUserId}</code>\n" .
+                  "当前白名单人数：" . count($config->getAdminWhitelistArray()) . " 人"
+                : "✅ Removed from admin whitelist\n\n" .
+                  "User ID: <code>{$targetUserId}</code>\n" .
+                  "Current whitelist count: " . count($config->getAdminWhitelistArray()) . " users";
+
+            return ['success' => true, 'message' => $message];
+
+        } catch (\Throwable $e) {
+            Log::error("移除管理员白名单失败", [
+                'chat_id' => $chatId,
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? "❌ 操作失败：" . $e->getMessage()
+                    : "❌ Operation failed: " . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 查看管理员白名单命令（管理员专用）
+     */
+    protected function handleListAdmins(int $chatId, int $userId, bool $isCn): array
+    {
+        // 验证管理员权限
+        if (!TelegramBotHelper::checkAdmin($chatId, $userId)) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '❌ 只有管理员可以执行此操作' : '❌ Only administrators can perform this action',
+            ];
+        }
+
+        try {
+            // 获取群组配置
+            $config = $this->configService->getByTgChatId($chatId);
+            if (!$config) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "❌ 群组未配置"
+                        : "❌ Group not configured",
+                ];
+            }
+
+            $whitelist = $config->getAdminWhitelistArray();
+
+            if (empty($whitelist)) {
+                return [
+                    'success' => true,
+                    'message' => $isCn
+                        ? "📋 管理员白名单\n\n⚠️ 白名单为空\n\n💡 使用 /添加管理 添加管理员"
+                        : "📋 Admin Whitelist\n\n⚠️ Whitelist is empty\n\n💡 Use /add_admin to add administrators",
+                ];
+            }
+
+            $message = $isCn
+                ? "📋 管理员白名单\n\n" .
+                  "总计：" . count($whitelist) . " 人\n\n" .
+                  "用户ID列表：\n"
+                : "📋 Admin Whitelist\n\n" .
+                  "Total: " . count($whitelist) . " users\n\n" .
+                  "User ID List:\n";
+
+            foreach ($whitelist as $index => $adminId) {
+                $message .= ($index + 1) . ". <code>{$adminId}</code>\n";
+            }
+
+            $message .= "\n💡 ";
+            $message .= $isCn
+                ? "使用 /添加管理 添加 | 使用 /移除管理 移除"
+                : "Use /add_admin to add | Use /remove_admin to remove";
+
+            return ['success' => true, 'message' => $message];
+
+        } catch (\Throwable $e) {
+            Log::error("查看管理员白名单失败", [
+                'chat_id' => $chatId,
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? "❌ 操作失败：" . $e->getMessage()
+                    : "❌ Operation failed: " . $e->getMessage(),
             ];
         }
     }
