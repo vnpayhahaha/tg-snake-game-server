@@ -1074,8 +1074,12 @@ class TgBotCommandService
         } catch (\Throwable $e) {
             Log::error("设置钱包地址失败", [
                 'chat_id' => $chatId,
+                'user_id' => $userId,
                 'wallet_address' => $walletAddress,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [

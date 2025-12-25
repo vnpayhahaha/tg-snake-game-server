@@ -36,14 +36,30 @@ abstract class BaseService extends IService
         CacheableProcessor::clearCollection();
     }
 
-    // 获取当前管理员用户名
+    // 获取当前管理员用户名（兼容多种环境）
     public function getCurrentUserName(): string
     {
-        return request()->user->username ?? '';
+        try {
+            $request = request();
+            if ($request && isset($request->user) && isset($request->user->username)) {
+                return $request->user->username;
+            }
+        } catch (\Throwable $e) {
+            // 忽略错误，返回默认值
+        }
+        return '';
     }
 
     public function getCurrentUserId(): int
     {
-        return request()->user->id ?? 0;
+        try {
+            $request = request();
+            if ($request && isset($request->user) && isset($request->user->id)) {
+                return $request->user->id;
+            }
+        } catch (\Throwable $e) {
+            // 忽略错误，返回默认值
+        }
+        return 0;
     }
 }

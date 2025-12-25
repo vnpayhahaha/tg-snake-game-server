@@ -273,17 +273,40 @@ class TgGameGroupConfigService extends BaseService
      */
     protected function logConfigChange($oldConfig, array $newData, int $changeSource = 1): void
     {
-        $this->configLogRepository->logConfigChange([
-            'config_id' => $oldConfig->id,
-            'tg_chat_id' => $oldConfig->tg_chat_id,
-            'change_params' => json_encode($newData),
-            'old_config' => json_encode($oldConfig->toArray()),
-            'new_config' => json_encode(array_merge($oldConfig->toArray(), $newData)),
-            'operator' => $this->getCurrentUserName() ?: 'system',
-            'operator_ip' => request()?->getRealIp() ?? '127.0.0.1',
-            'change_source' => $changeSource,
-            'tg_message_id' => null,
-        ]);
+        try {
+            $this->configLogRepository->logConfigChange([
+                'config_id' => $oldConfig->id,
+                'tg_chat_id' => $oldConfig->tg_chat_id,
+                'change_params' => json_encode($newData),
+                'old_config' => json_encode($oldConfig->toArray()),
+                'new_config' => json_encode(array_merge($oldConfig->toArray(), $newData)),
+                'operator' => $this->getCurrentUserName() ?: 'system',
+                'operator_ip' => $this->getOperatorIp(),
+                'change_source' => $changeSource,
+                'tg_message_id' => null,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("记录配置变更日志失败: " . $e->getMessage(), [
+                'config_id' => $oldConfig->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * 获取操作者IP（兼容多种环境）
+     */
+    protected function getOperatorIp(): string
+    {
+        try {
+            $request = request();
+            if ($request) {
+                return $request->getRealIp() ?? '127.0.0.1';
+            }
+        } catch (\Throwable $e) {
+            // 忽略错误
+        }
+        return '127.0.0.1';
     }
 
     /**
