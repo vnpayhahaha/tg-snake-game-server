@@ -29,7 +29,7 @@ class CommandEnum
         'group_config'         => 'GroupConfig',
         'get_id'               => 'GetId',
         'get_group_id'         => 'GetGroupId',
-        // 管理员初始化指令
+        // 群组初始化指令
         'bind_tenant'          => 'BindTenant',
         'set_wallet'           => 'SetWallet',
         'set_bet_amount'       => 'SetBetAmount',
@@ -58,8 +58,8 @@ class CommandEnum
         'group_config'         => "<blockquote>[Admin Only] View group configuration\n[Example] /group_config</blockquote>",
         'get_id'               => "<blockquote>Get your Telegram user ID\n[Example] /get_id</blockquote>",
         'get_group_id'         => "<blockquote>Get current group chat ID\n[Example] /get_group_id</blockquote>",
-        // 管理员初始化指令
-        'bind_tenant'          => "<blockquote>[Admin Only] Bind tenant ID to this group\n[Example] /bind_tenant TENANT_ID\n[Param] tenant_id - Tenant ID</blockquote>",
+        // 群组初始化指令
+        'bind_tenant'          => "<blockquote>Bind tenant ID to this group (First binder becomes admin)\n[Example] /bind_tenant TENANT_ID\n[Param] tenant_id - Tenant ID\n[Note] Anyone can bind if group is not yet configured</blockquote>",
         'set_wallet'           => "<blockquote>[Admin Only] Set receive wallet address\n[Example] /set_wallet TRON_ADDRESS\n[Param] wallet_address - TRON wallet address for receiving bets</blockquote>",
         'set_bet_amount'       => "<blockquote>[Admin Only] Set bet amount\n[Example] /set_bet_amount 5\n[Param] amount - Bet amount in TRX (default: 5)</blockquote>",
         // 管理员白名单管理
@@ -87,7 +87,7 @@ class CommandEnum
         '群组配置' => 'cnGroupConfig',
         '获取ID'   => 'cnGetId',
         '获取群ID' => 'cnGetGroupId',
-        // 管理员初始化指令
+        // 群组初始化指令
         '绑定租户' => 'cnBindTenant',
         '设置钱包' => 'cnSetWallet',
         '设置投注' => 'cnSetBetAmount',
@@ -116,8 +116,8 @@ class CommandEnum
         '群组配置' => "<blockquote>[仅管理员] 查看群组配置\n[示例] /群组配置</blockquote>",
         '获取ID'   => "<blockquote>获取您的Telegram用户ID\n[示例] /获取ID</blockquote>",
         '获取群ID' => "<blockquote>获取当前群组聊天ID\n[示例] /获取群ID</blockquote>",
-        // 管理员初始化指令
-        '绑定租户' => "<blockquote>[仅管理员] 绑定租户ID到此群组\n[示例] /绑定租户 租户ID\n[参数] tenant_id - 租户ID</blockquote>",
+        // 群组初始化指令
+        '绑定租户' => "<blockquote>绑定租户ID到此群组（首次绑定者自动成为管理员）\n[示例] /绑定租户 租户ID\n[参数] tenant_id - 租户ID\n[说明] 未配置群组时任何人都可以绑定</blockquote>",
         '设置钱包' => "<blockquote>[仅管理员] 设置收款钱包地址\n[示例] /设置钱包 TRON地址\n[参数] wallet_address - 用于接收投注的TRON钱包地址</blockquote>",
         '设置投注' => "<blockquote>[仅管理员] 设置投注金额\n[示例] /设置投注 5\n[参数] amount - TRX投注金额(默认:5)</blockquote>",
         // 管理员白名单管理
@@ -185,8 +185,15 @@ class CommandEnum
                 $reply[] = self::getCommandDesc($key, true);
             }
             $reply[] = '';
+            $reply[] = '【群组初始化命令】';
+            $initCommands = ['绑定租户', '设置钱包', '设置投注'];
+            foreach ($initCommands as $key) {
+                $reply[] = '/' . $key;
+                $reply[] = self::getCommandDesc($key, true);
+            }
+            $reply[] = '';
             $reply[] = '【管理员命令】';
-            $adminCommands = ['钱包变更', '取消变更', '群组配置'];
+            $adminCommands = ['钱包变更', '取消变更', '群组配置', '添加管理', '移除管理', '管理列表'];
             foreach ($adminCommands as $key) {
                 $reply[] = '/' . $key;
                 $reply[] = self::getCommandDesc($key, true);
@@ -208,8 +215,15 @@ class CommandEnum
                 $reply[] = self::getCommandDesc($key, false);
             }
             $reply[] = '';
+            $reply[] = '【Group Initialization】';
+            $initCommands = ['bind_tenant', 'set_wallet', 'set_bet_amount'];
+            foreach ($initCommands as $key) {
+                $reply[] = '/' . $key;
+                $reply[] = self::getCommandDesc($key, false);
+            }
+            $reply[] = '';
             $reply[] = '【Admin Commands】';
-            $adminCommands = ['wallet_change', 'cancel_wallet_change', 'group_config'];
+            $adminCommands = ['wallet_change', 'cancel_wallet_change', 'group_config', 'add_admin', 'remove_admin', 'list_admins'];
             foreach ($adminCommands as $key) {
                 $reply[] = '/' . $key;
                 $reply[] = self::getCommandDesc($key, false);

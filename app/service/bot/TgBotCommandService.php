@@ -842,18 +842,11 @@ class TgBotCommandService
     }
 
     /**
-     * 绑定租户ID命令（管理员专用）
+     * 绑定租户ID命令
+     * 注意：首次绑定时无需管理员权限，谁先绑定谁就是管理员
      */
     protected function handleBindTenant(int $chatId, int $userId, array $params, bool $isCn): array
     {
-        // 验证管理员权限
-        if (!TelegramBotHelper::checkAdmin($chatId, $userId)) {
-            return [
-                'success' => false,
-                'message' => $isCn ? '❌ 只有管理员可以执行此操作' : '❌ Only administrators can perform this action',
-            ];
-        }
-
         // 验证参数
         if (empty($params[0])) {
             return [
@@ -867,9 +860,47 @@ class TgBotCommandService
         $tenantId = trim($params[0]);
 
         try {
-            // 检查群组是否已存在配置
+            // 1. 检查当前群组是否已有配置
             $config = $this->configService->getByTgChatId($chatId);
 
+            // 2. 如果已有配置，需要管理员权限才能修改
+            if ($config) {
+                if (!TelegramBotHelper::checkAdmin($chatId, $userId)) {
+                    return [
+                        'success' => false,
+                        'message' => $isCn
+                            ? '❌ 群组已绑定租户，只有管理员可以修改'
+                            : '❌ Group already bound, only administrators can modify',
+                    ];
+                }
+            }
+
+            // 3. 验证租户ID是否存在
+            $tenant = \app\model\ModelTenant::where('tenant_id', $tenantId)->first();
+            if (!$tenant) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "❌ 租户ID不存在\n租户ID：{$tenantId}\n\n请检查租户ID是否正确"
+                        : "❌ Tenant ID does not exist\nTenant ID: {$tenantId}\n\nPlease check if the tenant ID is correct",
+                ];
+            }
+
+            // 4. 检查该租户ID是否已被其他群绑定
+            $existingConfig = \app\model\ModelTgGameGroupConfig::where('tenant_id', $tenantId)
+                ->where('tg_chat_id', '!=', $chatId)
+                ->first();
+
+            if ($existingConfig) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "❌ 租户ID已被其他群绑定\n租户ID：{$tenantId}\n已绑定群组ID：{$existingConfig->tg_chat_id}\n\n一个租户ID只能绑定一个群组"
+                        : "❌ Tenant ID is already bound to another group\nTenant ID: {$tenantId}\nBound Group ID: {$existingConfig->tg_chat_id}\n\nOne tenant ID can only be bound to one group",
+                ];
+            }
+
+            // 5. 更新或创建配置
             if ($config) {
                 // 更新租户ID
                 $this->configService->updateConfig($config->id, [
@@ -877,53 +908,66 @@ class TgBotCommandService
                 ]);
 
                 $message = $isCn
-                    ? "✅ 租户ID已更新\n" .
+                    ? "✅ 租户ID已更新\n\n" .
                       "租户ID：{$tenantId}\n" .
-                      "群组ID：{$chatId}"
-                    : "✅ Tenant ID updated\n" .
+                      "租户名称：{$tenant->company_name}\n" .
+                      "群组ID：{$chatId}\n" .
+                      "当前投注金额：{$config->bet_amount} TRX\n" .
+                      "钱包地址：" . ($config->wallet_address ?: '未设置') . "\n\n" .
+                      ($config->wallet_address ? "✅ 群组已配置完成，可以开始游戏" : "⚠️ 请继续设置收款钱包：/设置钱包 TRON地址")
+                    : "✅ Tenant ID updated\n\n" .
                       "Tenant ID: {$tenantId}\n" .
-                      "Group ID: {$chatId}";
+                      "Tenant Name: {$tenant->company_name}\n" .
+                      "Group ID: {$chatId}\n" .
+                      "Current Bet Amount: {$config->bet_amount} TRX\n" .
+                      "Wallet Address: " . ($config->wallet_address ?: 'Not set') . "\n\n" .
+                      ($config->wallet_address ? "✅ Group configured, game is ready" : "⚠️ Please set wallet: /set_wallet TRON_ADDRESS");
             } else {
-                // 创建新配置
-                $group = $this->groupService->getGroupByTgChatId($chatId);
-                if (!$group) {
-                    // 创建群组记录
-                    $group = $this->groupService->create([
-                        'tg_chat_id' => $chatId,
-                        'tg_chat_title' => 'Unknown', // 会在后续更新
-                        'tenant_id' => $tenantId,
-                        'status' => 1,
-                    ]);
-                }
-
-                // 创建群组配置
-                $this->configService->create([
+                // 创建新配置，并将执行绑定的用户设为首位管理员
+                $newConfig = \app\model\ModelTgGameGroupConfig::create([
                     'tenant_id' => $tenantId,
                     'tg_chat_id' => $chatId,
-                    'tg_chat_title' => 'Unknown',
+                    'tg_chat_title' => 'Unknown', // 会在webhook中更新为实际群组名称
                     'wallet_address' => '',
                     'bet_amount' => 5.0, // 默认5 TRX
                     'platform_fee_rate' => 0.10, // 默认10%
                     'wallet_change_count' => 0,
                     'wallet_change_status' => 1,
+                    'telegram_admin_whitelist' => (string)$userId, // 将绑定者设为首位管理员
                     'status' => 0, // 初始状态为禁用，需要设置钱包后才能启用
                 ]);
 
+                Log::info("租户绑定成功，用户自动成为管理员", [
+                    'chat_id' => $chatId,
+                    'user_id' => $userId,
+                    'tenant_id' => $tenantId,
+                ]);
+
                 $message = $isCn
-                    ? "✅ 租户ID已绑定\n" .
+                    ? "✅ 租户ID已绑定\n\n" .
                       "租户ID：{$tenantId}\n" .
+                      "租户名称：{$tenant->company_name}\n" .
                       "群组ID：{$chatId}\n" .
-                      "默认投注金额：5 TRX\n\n" .
+                      "默认投注金额：5 TRX\n" .
+                      "平台手续费：10%\n\n" .
+                      "🎉 您已自动成为群组管理员！\n" .
+                      "用户ID：{$userId}\n\n" .
                       "⚠️ 请继续执行以下步骤：\n" .
                       "1️⃣ 设置收款钱包：/设置钱包 TRON地址\n" .
-                      "2️⃣ 设置投注金额（可选）：/设置投注 金额"
-                    : "✅ Tenant ID bound\n" .
+                      "2️⃣ 设置投注金额（可选）：/设置投注 金额\n" .
+                      "3️⃣ 添加其他管理员（可选）：/添加管理 @用户名"
+                    : "✅ Tenant ID bound\n\n" .
                       "Tenant ID: {$tenantId}\n" .
+                      "Tenant Name: {$tenant->company_name}\n" .
                       "Group ID: {$chatId}\n" .
-                      "Default Bet Amount: 5 TRX\n\n" .
+                      "Default Bet Amount: 5 TRX\n" .
+                      "Platform Fee: 10%\n\n" .
+                      "🎉 You are now the group administrator!\n" .
+                      "User ID: {$userId}\n\n" .
                       "⚠️ Please continue with these steps:\n" .
                       "1️⃣ Set wallet: /set_wallet TRON_ADDRESS\n" .
-                      "2️⃣ Set bet amount (optional): /set_bet_amount AMOUNT";
+                      "2️⃣ Set bet amount (optional): /set_bet_amount AMOUNT\n" .
+                      "3️⃣ Add other admins (optional): /add_admin @username";
             }
 
             return ['success' => true, 'message' => $message];
@@ -931,8 +975,10 @@ class TgBotCommandService
         } catch (\Throwable $e) {
             Log::error("绑定租户ID失败", [
                 'chat_id' => $chatId,
+                'user_id' => $userId,
                 'tenant_id' => $tenantId,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
