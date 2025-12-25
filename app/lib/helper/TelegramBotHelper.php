@@ -44,9 +44,9 @@ class TelegramBotHelper
     protected static function getInstance(): self
     {
         if (self::$instance === null) {
-            $botToken = getenv('TELEGRAM_BOT_TOKEN') ?: config('app.telegram_bot_token', '');
+            $botToken = getenv('TELEGRAM_TOKEN') ?: config('app.telegram_bot_token', '');
             if (empty($botToken)) {
-                throw new \RuntimeException('Telegram Bot Token未配置，请在环境变量中设置TELEGRAM_BOT_TOKEN');
+                throw new \RuntimeException('Telegram Bot Token未配置，请在环境变量中设置TELEGRAM_TOKEN');
             }
             self::$instance = new self($botToken);
         }
