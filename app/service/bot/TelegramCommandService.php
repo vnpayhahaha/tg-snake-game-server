@@ -370,14 +370,14 @@ class TelegramCommandService
     public function GetId(int $uid, array $params, int $recordID): string|array
     {
         return [
-            'Your chat ID is:' . $this->telegramBot->ChatID(),
+            'Your chat ID is:' . $this->telegramBot->UserID(),
         ];
     }
 
     public function cnGetId(int $uid, array $params, int $recordID): string|array
     {
         return [
-            '你的聊天ID是:' . $this->telegramBot->ChatID(),
+            '你的聊天ID是:' . $this->telegramBot->UserID(),
         ];
     }
 
