@@ -133,7 +133,14 @@ class CommandEnum
     {
         $command_set_cn_keys = array_keys(self::COMMAND_SET_CN);
         $command_set_keys = array_keys(self::COMMAND_SET);
-        return in_array($command, $command_set_cn_keys, true)
+
+        // 对中文命令进行大小写不敏感的匹配
+        $commandLower = mb_strtolower(trim($command), 'UTF-8');
+        $command_set_cn_keys_lower = array_map(function($key) {
+            return mb_strtolower($key, 'UTF-8');
+        }, $command_set_cn_keys);
+
+        return in_array($commandLower, $command_set_cn_keys_lower, true)
             || in_array(strtolower(trim($command)), $command_set_keys, true);
     }
 
@@ -142,15 +149,23 @@ class CommandEnum
      */
     public static function getCommand(string $command): string
     {
-        $command_set_cn_keys = array_keys(self::COMMAND_SET_CN);
-        if (in_array($command, $command_set_cn_keys, true)) {
-            return self::COMMAND_SET_CN[$command];
+        // 对中文命令进行大小写不敏感的匹配
+        $commandLower = mb_strtolower(trim($command), 'UTF-8');
+
+        // 遍历中文命令集，进行大小写不敏感的匹配
+        foreach (self::COMMAND_SET_CN as $key => $value) {
+            if (mb_strtolower($key, 'UTF-8') === $commandLower) {
+                return $value;
+            }
         }
-        $commandLower = strtolower(trim($command));
+
+        // 英文命令匹配（已经是小写的）
+        $commandLowerEn = strtolower(trim($command));
         $command_set_keys = array_keys(self::COMMAND_SET);
-        if (in_array($commandLower, $command_set_keys, true)) {
-            return self::COMMAND_SET[$commandLower];
+        if (in_array($commandLowerEn, $command_set_keys, true)) {
+            return self::COMMAND_SET[$commandLowerEn];
         }
+
         return '';
     }
 
@@ -167,21 +182,21 @@ class CommandEnum
             $playerCommands = ['帮助', '开始', '规则', '蛇身', '绑定钱包', '解绑钱包', '我的钱包', '我的票号', '我的中奖', '奖池', '最近中奖', '统计'];
             foreach ($playerCommands as $key) {
                 $reply[] = '/' . $key;
-                $reply[] = self::$commandDescCnMap[$key];
+                $reply[] = self::getCommandDesc($key, true);
             }
             $reply[] = '';
             $reply[] = '【管理员命令】';
             $adminCommands = ['钱包变更', '取消变更', '群组配置'];
             foreach ($adminCommands as $key) {
                 $reply[] = '/' . $key;
-                $reply[] = self::$commandDescCnMap[$key];
+                $reply[] = self::getCommandDesc($key, true);
             }
             $reply[] = '';
             $reply[] = '【工具命令】';
             $utilCommands = ['获取ID', '获取群ID'];
             foreach ($utilCommands as $key) {
                 $reply[] = '/' . $key;
-                $reply[] = self::$commandDescCnMap[$key];
+                $reply[] = self::getCommandDesc($key, true);
             }
         } else {
             $reply[] = '***** Snake Chain Game - Command List *****';
@@ -190,23 +205,47 @@ class CommandEnum
             $playerCommands = ['help', 'start', 'rules', 'snake', 'bind_wallet', 'unbind_wallet', 'my_wallet', 'my_tickets', 'my_wins', 'prize_pool', 'recent_wins', 'stats'];
             foreach ($playerCommands as $key) {
                 $reply[] = '/' . $key;
-                $reply[] = self::$commandDescMap[$key];
+                $reply[] = self::getCommandDesc($key, false);
             }
             $reply[] = '';
             $reply[] = '【Admin Commands】';
             $adminCommands = ['wallet_change', 'cancel_wallet_change', 'group_config'];
             foreach ($adminCommands as $key) {
                 $reply[] = '/' . $key;
-                $reply[] = self::$commandDescMap[$key];
+                $reply[] = self::getCommandDesc($key, false);
             }
             $reply[] = '';
             $reply[] = '【Utility Commands】';
             $utilCommands = ['get_id', 'get_group_id'];
             foreach ($utilCommands as $key) {
                 $reply[] = '/' . $key;
-                $reply[] = self::$commandDescMap[$key];
+                $reply[] = self::getCommandDesc($key, false);
             }
         }
         return $reply;
+    }
+
+    /**
+     * 获取命令描述（支持大小写不敏感）
+     */
+    private static function getCommandDesc(string $command, bool $isCn): string
+    {
+        $descMap = $isCn ? self::$commandDescCnMap : self::$commandDescMap;
+
+        // 如果直接存在，直接返回
+        if (isset($descMap[$command])) {
+            return $descMap[$command];
+        }
+
+        // 大小写不敏感查找
+        $commandLower = $isCn ? mb_strtolower($command, 'UTF-8') : strtolower($command);
+        foreach ($descMap as $key => $value) {
+            $keyLower = $isCn ? mb_strtolower($key, 'UTF-8') : strtolower($key);
+            if ($keyLower === $commandLower) {
+                return $value;
+            }
+        }
+
+        return '';
     }
 }
