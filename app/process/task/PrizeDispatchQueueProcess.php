@@ -66,6 +66,9 @@ class PrizeDispatchQueueProcess
      */
     protected function processPendingTasks(): void
     {
+        // 确保数据库连接可用
+        $this->ensureDatabaseConnection();
+
         // 获取待处理的任务（按优先级排序）
         $tasks = $this->queueRepository->getPendingTasks(10);
 
@@ -149,6 +152,9 @@ class PrizeDispatchQueueProcess
      */
     protected function handleTimeoutTasks(): void
     {
+        // 确保数据库连接可用
+        $this->ensureDatabaseConnection();
+
         // 查找超时任务（处理中超过5分钟）
         $timeoutMinutes = 5;
         $tasks = $this->queueRepository->getTimeoutTasks($timeoutMinutes);
@@ -181,6 +187,9 @@ class PrizeDispatchQueueProcess
      */
     protected function retryFailedTasks(): void
     {
+        // 确保数据库连接可用
+        $this->ensureDatabaseConnection();
+
         // 获取可重试的失败任务
         $tasks = $this->queueRepository->getRetryableTasks(5);
 
@@ -212,6 +221,35 @@ class PrizeDispatchQueueProcess
 
             } catch (\Throwable $e) {
                 Log::error("重试任务 {$task->id} 失败: " . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * 确保数据库连接可用
+     * 处理 "MySQL server has gone away" 问题
+     */
+    protected function ensureDatabaseConnection(): void
+    {
+        try {
+            // 尝试执行简单查询来检查连接
+            \support\Db::connection()->select('SELECT 1');
+        } catch (\Throwable $e) {
+            // 如果连接失败，重新连接
+            Log::warning("数据库连接断开，正在重新连接...", [
+                'error' => $e->getMessage()
+            ]);
+
+            try {
+                // 断开当前连接
+                \support\Db::connection()->disconnect();
+                // 重新连接
+                \support\Db::connection()->reconnect();
+
+                Log::info("数据库重新连接成功");
+            } catch (\Throwable $reconnectError) {
+                Log::error("数据库重新连接失败: " . $reconnectError->getMessage());
+                throw $reconnectError;
             }
         }
     }

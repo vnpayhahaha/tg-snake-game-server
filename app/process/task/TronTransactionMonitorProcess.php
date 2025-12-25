@@ -2,6 +2,7 @@
 
 namespace app\process\task;
 
+use app\lib\helper\TronWebHelper;
 use app\service\TgGameGroupConfigService;
 use app\service\TgTronMonitorService;
 use DI\Attribute\Inject;
@@ -19,6 +20,9 @@ class TronTransactionMonitorProcess
 
     #[Inject]
     protected TgTronMonitorService $monitorService;
+
+    #[Inject]
+    protected TronWebHelper $tronHelper;
 
     public function onWorkerStart(): void
     {
@@ -43,6 +47,9 @@ class TronTransactionMonitorProcess
      */
     protected function monitorTransactions(): void
     {
+        // 确保数据库连接可用（处理断线重连）
+        $this->ensureDatabaseConnection();
+
         // 获取所有活跃配置
         $activeConfigs = $this->configService->getActiveConfigs();
 
@@ -68,50 +75,123 @@ class TronTransactionMonitorProcess
     }
 
     /**
+     * 确保数据库连接可用
+     * 处理 "MySQL server has gone away" 问题
+     */
+    protected function ensureDatabaseConnection(): void
+    {
+        try {
+            // 尝试执行简单查询来检查连接
+            \support\Db::connection()->select('SELECT 1');
+        } catch (\Throwable $e) {
+            // 如果连接失败，重新连接
+            Log::warning("数据库连接断开，正在重新连接...", [
+                'error' => $e->getMessage()
+            ]);
+
+            try {
+                // 断开当前连接
+                \support\Db::connection()->disconnect();
+                // 重新连接
+                \support\Db::connection()->reconnect();
+
+                Log::info("数据库重新连接成功");
+            } catch (\Throwable $reconnectError) {
+                Log::error("数据库重新连接失败: " . $reconnectError->getMessage());
+                throw $reconnectError;
+            }
+        }
+    }
+
+    /**
      * 监控单个群组的交易
      */
     protected function monitorGroupTransactions($config): void
     {
-        // TODO: 这里需要调用TRON API获取最新交易
-        // 示例伪代码：
-        // 1. 获取上次检查的区块高度
+        // 获取上次检查的区块高度
         $lastBlockHeight = $this->monitorService->getLatestBlockHeight($config->id) ?? 0;
 
-        // 2. 调用TRON API查询该地址的新交易（需要实现TronWebHelper）
-        // $tronHelper = Container::get(TronWebHelper::class);
-        // $transactions = $tronHelper->getTransactionsByAddress(
-        //     $config->wallet_address,
-        //     $lastBlockHeight
-        // );
+        try {
+            // 使用TronWebHelper获取钱包地址的交易历史
+            $transactions = $this->tronHelper->getTransactionHistory(
+                $config->wallet_address,
+                $lastBlockHeight
+            );
 
-        // 3. 处理每笔入账交易
-        // foreach ($transactions as $tx) {
-        //     if ($tx['type'] === 'incoming') {
-        //         $result = $this->monitorService->processIncomingTransaction($config->id, [
-        //             'tx_hash' => $tx['tx_hash'],
-        //             'from_address' => $tx['from'],
-        //             'to_address' => $tx['to'],
-        //             'amount' => $tx['amount'],
-        //             'block_height' => $tx['block_height'],
-        //             'block_timestamp' => $tx['timestamp'],
-        //             'status' => $tx['status'],
-        //         ]);
-        //
-        //         if ($result['success']) {
-        //             Log::info("处理入账交易成功", [
-        //                 'group_id' => $config->id,
-        //                 'tx_hash' => $tx['tx_hash'],
-        //                 'amount' => $tx['amount'],
-        //             ]);
-        //         }
-        //     }
-        // }
+            // 如果没有新交易，直接返回
+            if (empty($transactions)) {
+                Log::debug("群组 {$config->id} 没有新交易", [
+                    'wallet_address' => $config->wallet_address,
+                    'last_block_height' => $lastBlockHeight,
+                ]);
+                return;
+            }
 
-        Log::debug("监控群组交易", [
-            'group_id' => $config->id,
-            'wallet_address' => $config->wallet_address,
-            'last_block_height' => $lastBlockHeight,
-        ]);
+            Log::info("发现 " . count($transactions) . " 笔新交易", [
+                'group_id' => $config->id,
+                'wallet_address' => $config->wallet_address,
+            ]);
+
+            // 处理每笔交易
+            foreach ($transactions as $tx) {
+                // 只处理转入交易（防御性检查）
+                if ($tx['to_address'] !== $config->wallet_address) {
+                    Log::warning("检测到非转入交易，跳过", [
+                        'tx_hash' => $tx['tx_hash'],
+                        'to_address' => $tx['to_address'],
+                        'expected_address' => $config->wallet_address,
+                    ]);
+                    continue;
+                }
+
+                // 调用监控服务处理入账交易
+                $result = $this->monitorService->processIncomingTransaction($config->id, [
+                    'tx_hash' => $tx['tx_hash'],
+                    'from_address' => $tx['from_address'],
+                    'to_address' => $tx['to_address'],
+                    'amount' => $tx['amount'],  // SUN单位
+                    'block_height' => $tx['block_height'],
+                    'block_timestamp' => $tx['block_timestamp'],
+                    'status' => $tx['status'],  // SUCCESS/FAILED
+                ]);
+
+                if ($result['success']) {
+                    Log::info("处理入账交易成功", [
+                        'group_id' => $config->id,
+                        'tx_hash' => $tx['tx_hash'],
+                        'amount_sun' => $tx['amount'],
+                        'amount_trx' => TronWebHelper::sunToTrx($tx['amount']),
+                        'block_height' => $tx['block_height'],
+                    ]);
+                } else {
+                    Log::warning("处理入账交易失败", [
+                        'group_id' => $config->id,
+                        'tx_hash' => $tx['tx_hash'],
+                        'error' => $result['message'],
+                    ]);
+                }
+            }
+
+            // 记录监控完成
+            // 注意：区块高度会通过交易日志自动更新，无需手动更新
+            // getLatestBlockHeight() 方法会从交易表中获取最大的 block_height
+            $latestBlock = max(array_column($transactions, 'block_height'));
+
+            Log::info("群组交易监控完成", [
+                'group_id' => $config->id,
+                'processed_count' => count($transactions),
+                'last_block_height' => $lastBlockHeight,
+                'latest_block' => $latestBlock,
+            ]);
+
+        } catch (\Throwable $e) {
+            Log::error("监控群组交易异常: " . $e->getMessage(), [
+                'group_id' => $config->id,
+                'wallet_address' => $config->wallet_address,
+                'last_block_height' => $lastBlockHeight,
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
     }
 
     /**

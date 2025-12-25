@@ -16,6 +16,12 @@ class TelegramBotHelper
     protected string $apiUrl;
 
     /**
+     * 单例实例
+     * @var static|null
+     */
+    protected static ?self $instance = null;
+
+    /**
      * @param string $botToken Telegram Bot Token
      */
     public function __construct(string $botToken)
@@ -29,6 +35,22 @@ class TelegramBotHelper
                 'Content-Type' => 'application/json',
             ],
         ]);
+    }
+
+    /**
+     * 获取实例（从环境变量获取Bot Token）
+     * @return static
+     */
+    protected static function getInstance(): self
+    {
+        if (self::$instance === null) {
+            $botToken = getenv('TELEGRAM_BOT_TOKEN') ?: config('app.telegram_bot_token', '');
+            if (empty($botToken)) {
+                throw new \RuntimeException('Telegram Bot Token未配置，请在环境变量中设置TELEGRAM_BOT_TOKEN');
+            }
+            self::$instance = new self($botToken);
+        }
+        return self::$instance;
     }
 
     /**
@@ -380,5 +402,54 @@ class TelegramBotHelper
     public function deleteWebhook(): bool
     {
         return $this->setWebhook('');
+    }
+
+    // ==================== 静态方法包装器 ====================
+
+    /**
+     * 静态方法：发送消息（简化调用）
+     * @param int|string $chatId 聊天ID
+     * @param string $text 消息文本
+     * @param array $options 额外选项
+     * @return array|null
+     */
+    public static function send($chatId, string $text, array $options = []): ?array
+    {
+        return self::getInstance()->sendMessage($chatId, $text, $options);
+    }
+
+    /**
+     * 静态方法：检查用户是否是管理员
+     * @param int|string $chatId 聊天ID
+     * @param int $userId 用户ID
+     * @return bool
+     */
+    public static function checkAdmin($chatId, int $userId): bool
+    {
+        return self::getInstance()->isAdmin($chatId, $userId);
+    }
+
+    /**
+     * 静态方法：获取聊天成员信息
+     * @param int|string $chatId 聊天ID
+     * @param int $userId 用户ID
+     * @return array|null
+     */
+    public static function getMember($chatId, int $userId): ?array
+    {
+        return self::getInstance()->getChatMember($chatId, $userId);
+    }
+
+    /**
+     * 静态方法：发送通知
+     * @param int|string $chatId 聊天ID
+     * @param string $title 通知标题
+     * @param string $content 通知内容
+     * @param string $type 通知类型
+     * @return array|null
+     */
+    public static function notify($chatId, string $title, string $content, string $type = 'info'): ?array
+    {
+        return self::getInstance()->sendNotification($chatId, $title, $content, $type);
     }
 }

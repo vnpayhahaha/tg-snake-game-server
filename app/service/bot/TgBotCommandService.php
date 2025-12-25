@@ -2,6 +2,8 @@
 
 namespace app\service\bot;
 
+use app\lib\helper\TelegramBotHelper;
+use app\lib\helper\TronWebHelper;
 use app\service\TgGameGroupConfigService;
 use app\service\TgGameGroupService;
 use app\service\TgPlayerWalletBindingService;
@@ -29,6 +31,28 @@ class TgBotCommandService
 
     #[Inject]
     protected TgPrizeService $prizeService;
+
+    /**
+     * 验证是否为群组管理员
+     * @param int $chatId 群组ID
+     * @param int $userId 用户ID
+     * @return bool
+     */
+    protected function isGroupAdmin(int $chatId, int $userId): bool
+    {
+        try {
+            // 调用Telegram API验证用户是否为群组管理员
+            return TelegramBotHelper::checkAdmin($chatId, $userId);
+        } catch (\Throwable $e) {
+            Log::error("验证群组管理员失败: " . $e->getMessage(), [
+                'chat_id' => $chatId,
+                'user_id' => $userId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            // 如果API调用失败，出于安全考虑返回false
+            return false;
+        }
+    }
 
     /**
      * 处理命令
@@ -62,7 +86,7 @@ class TgBotCommandService
                 'GroupConfig', 'cnGroupConfig' => $this->handleGroupConfig($chatId, $userId, $command === 'cnGroupConfig'),
                 'GetId', 'cnGetId' => $this->handleGetId($userId, $command === 'cnGetId'),
                 'GetGroupId', 'cnGetGroupId' => $this->handleGetGroupId($chatId, $command === 'cnGetGroupId'),
-                default => $this->handleUnknown($command === 'cn' . ucfirst($command)),
+                default => $this->handleUnknown(str_starts_with($command, 'cn')),
             };
         } catch (\Throwable $e) {
             Log::error("处理命令失败: {$command}", [
@@ -72,7 +96,7 @@ class TgBotCommandService
             ]);
             return [
                 'success' => false,
-                'message' => $command === 'cn' . ucfirst($command) ? '命令处理失败，请稍后重试' : 'Command processing failed, please try again later',
+                'message' => str_starts_with($command, 'cn') ? '命令处理失败，请稍后重试' : 'Command processing failed, please try again later',
             ];
         }
     }
@@ -222,7 +246,15 @@ class TgBotCommandService
 
         $walletAddress = $params[0];
 
-        // TODO: 验证TRON钱包地址格式
+        // 验证TRON钱包地址格式
+        if (!TronWebHelper::isValidAddress($walletAddress)) {
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? '❌ 无效的TRON钱包地址格式'
+                    : '❌ Invalid TRON wallet address format',
+            ];
+        }
 
         $config = $this->configService->getByTgChatId($chatId);
         if (!$config) {
@@ -232,7 +264,12 @@ class TgBotCommandService
             ];
         }
 
-        $result = $this->bindingService->bindWallet($config->id, $userId, $username, $walletAddress);
+        $result = $this->bindingService->bindWallet([
+            'group_id' => $config->id,
+            'tg_user_id' => $userId,
+            'tg_username' => $username,
+            'wallet_address' => $walletAddress,
+        ]);
 
         if ($result['success']) {
             return [
@@ -314,11 +351,47 @@ class TgBotCommandService
      */
     protected function handleMyTickets(int $chatId, int $userId, bool $isCn): array
     {
-        // TODO: 实现获取用户票号逻辑
-        return [
-            'success' => false,
-            'message' => $isCn ? '功能开发中' : 'Feature under development',
-        ];
+        $config = $this->configService->getByTgChatId($chatId);
+        if (!$config) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '群组未配置' : 'Group not configured',
+            ];
+        }
+
+        $group = $this->groupService->getByConfigId($config->id);
+        if (!$group) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '群组未找到' : 'Group not found',
+            ];
+        }
+
+        // 获取用户在当前蛇身中的节点
+        $nodes = $this->nodeService->getPlayerActiveNodes($group->id, $userId);
+
+        if ($nodes->isEmpty()) {
+            return [
+                'success' => true,
+                'message' => $isCn ? '您还没有参与游戏' : 'You have not participated yet',
+            ];
+        }
+
+        $ticketList = $nodes->map(function ($node) use ($isCn) {
+            return $isCn
+                ? "票号：{$node->ticket_number} | 投注：{$node->bet_amount} TRX | 位置：#{$node->position}"
+                : "Ticket: {$node->ticket_number} | Bet: {$node->bet_amount} TRX | Position: #{$node->position}";
+        })->join("\n");
+
+        $text = $isCn
+            ? "🎫 我的票号\n\n" .
+              "总数：{$nodes->count()}\n\n" .
+              $ticketList
+            : "🎫 My Tickets\n\n" .
+              "Total: {$nodes->count()}\n\n" .
+              $ticketList;
+
+        return ['success' => true, 'message' => $text];
     }
 
     /**
@@ -326,11 +399,55 @@ class TgBotCommandService
      */
     protected function handleMyWins(int $chatId, int $userId, bool $isCn): array
     {
-        // TODO: 实现获取用户中奖记录逻辑
-        return [
-            'success' => false,
-            'message' => $isCn ? '功能开发中' : 'Feature under development',
-        ];
+        $config = $this->configService->getByTgChatId($chatId);
+        if (!$config) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '群组未配置' : 'Group not configured',
+            ];
+        }
+
+        $group = $this->groupService->getByConfigId($config->id);
+        if (!$group) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '群组未找到' : 'Group not found',
+            ];
+        }
+
+        // 获取用户的中奖记录（最近10条）
+        $winRecords = $this->prizeService->getPlayerWinRecords($group->id, $userId, 10);
+
+        if ($winRecords->isEmpty()) {
+            return [
+                'success' => true,
+                'message' => $isCn ? '您还没有中奖记录' : 'No winning records yet',
+            ];
+        }
+
+        $winList = $winRecords->map(function ($record) use ($isCn) {
+            $typeText = $isCn
+                ? ($record->prize_type == 1 ? 'Jackpot' : '范围匹配')
+                : ($record->prize_type == 1 ? 'Jackpot' : 'Range Match');
+
+            return $isCn
+                ? "🏆 {$typeText} | 票号：{$record->winning_ticket} | 奖金：{$record->prize_amount} TRX | {$record->created_at}"
+                : "🏆 {$typeText} | Ticket: {$record->winning_ticket} | Prize: {$record->prize_amount} TRX | {$record->created_at}";
+        })->join("\n\n");
+
+        $totalPrize = $winRecords->sum('prize_amount');
+
+        $text = $isCn
+            ? "🎉 我的中奖记录\n\n" .
+              "总中奖次数：{$winRecords->count()}\n" .
+              "总中奖金额：{$totalPrize} TRX\n\n" .
+              $winList
+            : "🎉 My Winning Records\n\n" .
+              "Total Wins: {$winRecords->count()}\n" .
+              "Total Prize: {$totalPrize} TRX\n\n" .
+              $winList;
+
+        return ['success' => true, 'message' => $text];
     }
 
     /**
@@ -370,11 +487,57 @@ class TgBotCommandService
      */
     protected function handleRecentWins(int $chatId, bool $isCn): array
     {
-        // TODO: 实现获取最近中奖记录逻辑
-        return [
-            'success' => false,
-            'message' => $isCn ? '功能开发中' : 'Feature under development',
-        ];
+        $config = $this->configService->getByTgChatId($chatId);
+        if (!$config) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '群组未配置' : 'Group not configured',
+            ];
+        }
+
+        $group = $this->groupService->getByConfigId($config->id);
+        if (!$group) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '群组未找到' : 'Group not found',
+            ];
+        }
+
+        // 获取最近的中奖记录（最近5条）
+        $recentWins = $this->prizeService->getGroupRecentWins($group->id, 5);
+
+        if ($recentWins->isEmpty()) {
+            return [
+                'success' => true,
+                'message' => $isCn ? '暂无中奖记录' : 'No winning records yet',
+            ];
+        }
+
+        $winList = $recentWins->map(function ($record) use ($isCn) {
+            $typeText = $isCn
+                ? ($record->prize_type == 1 ? 'Jackpot' : '范围匹配')
+                : ($record->prize_type == 1 ? 'Jackpot' : 'Range Match');
+
+            $username = $record->winner_username ?: 'User#' . $record->winner_tg_user_id;
+
+            return $isCn
+                ? "🏆 {$typeText}\n" .
+                  "   中奖用户：@{$username}\n" .
+                  "   票号：{$record->winning_ticket}\n" .
+                  "   奖金：{$record->prize_amount} TRX\n" .
+                  "   时间：{$record->created_at}"
+                : "🏆 {$typeText}\n" .
+                  "   Winner: @{$username}\n" .
+                  "   Ticket: {$record->winning_ticket}\n" .
+                  "   Prize: {$record->prize_amount} TRX\n" .
+                  "   Time: {$record->created_at}";
+        })->join("\n\n");
+
+        $text = $isCn
+            ? "🎊 最近中奖记录\n\n{$winList}"
+            : "🎊 Recent Winners\n\n{$winList}";
+
+        return ['success' => true, 'message' => $text];
     }
 
     /**
@@ -382,11 +545,50 @@ class TgBotCommandService
      */
     protected function handleStats(int $chatId, bool $isCn): array
     {
-        // TODO: 实现获取群组统计逻辑
-        return [
-            'success' => false,
-            'message' => $isCn ? '功能开发中' : 'Feature under development',
-        ];
+        $config = $this->configService->getByTgChatId($chatId);
+        if (!$config) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '群组未配置' : 'Group not configured',
+            ];
+        }
+
+        $group = $this->groupService->getByConfigId($config->id);
+        if (!$group) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '群组未找到' : 'Group not found',
+            ];
+        }
+
+        // 获取群组统计数据
+        $stats = $this->groupService->getGroupStatistics($group->id);
+
+        $text = $isCn
+            ? "📊 群组统计\n\n" .
+              "当前蛇身长度：{$stats['snake_length']}\n" .
+              "当前蛇头：{$stats['snake_head_ticket']}\n" .
+              "总奖池：{$group->prize_pool} TRX\n" .
+              "钱包周期：#{$group->current_wallet_cycle}\n\n" .
+              "参与玩家数：{$stats['total_players']}\n" .
+              "总投注金额：{$stats['total_bet_amount']} TRX\n" .
+              "总交易次数：{$stats['total_transactions']}\n\n" .
+              "Jackpot中奖次数：{$stats['jackpot_wins']}\n" .
+              "范围匹配次数：{$stats['range_wins']}\n" .
+              "总派奖金额：{$stats['total_prize_amount']} TRX"
+            : "📊 Group Statistics\n\n" .
+              "Current Snake Length: {$stats['snake_length']}\n" .
+              "Snake Head: {$stats['snake_head_ticket']}\n" .
+              "Prize Pool: {$group->prize_pool} TRX\n" .
+              "Wallet Cycle: #{$group->current_wallet_cycle}\n\n" .
+              "Total Players: {$stats['total_players']}\n" .
+              "Total Bet Amount: {$stats['total_bet_amount']} TRX\n" .
+              "Total Transactions: {$stats['total_transactions']}\n\n" .
+              "Jackpot Wins: {$stats['jackpot_wins']}\n" .
+              "Range Wins: {$stats['range_wins']}\n" .
+              "Total Prizes: {$stats['total_prize_amount']} TRX";
+
+        return ['success' => true, 'message' => $text];
     }
 
     /**
@@ -394,11 +596,75 @@ class TgBotCommandService
      */
     protected function handleWalletChange(int $chatId, int $userId, array $params, bool $isCn): array
     {
-        // TODO: 验证管理员权限
-        // TODO: 实现钱包变更逻辑
+        // 验证管理员权限
+        if (!$this->isGroupAdmin($chatId, $userId)) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '❌ 只有管理员可以执行此操作' : '❌ Only administrators can perform this action',
+            ];
+        }
+
+        if (count($params) < 2) {
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? '请提供新钱包地址和冷却时间（分钟）\n示例：/wallet_change TxxxNew... 60'
+                    : 'Please provide new wallet address and cooldown minutes\nExample: /wallet_change TxxxNew... 60',
+            ];
+        }
+
+        $newWalletAddress = $params[0];
+        $cooldownMinutes = (int)$params[1];
+
+        // 验证TRON钱包地址格式
+        if (!TronWebHelper::isValidAddress($newWalletAddress)) {
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? '❌ 无效的TRON钱包地址格式'
+                    : '❌ Invalid TRON wallet address format',
+            ];
+        }
+
+        if ($cooldownMinutes < 1 || $cooldownMinutes > 1440) {
+            return [
+                'success' => false,
+                'message' => $isCn
+                    ? '❌ 冷却时间必须在1-1440分钟之间'
+                    : '❌ Cooldown must be between 1-1440 minutes',
+            ];
+        }
+
+        $config = $this->configService->getByTgChatId($chatId);
+        if (!$config) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '群组未配置' : 'Group not configured',
+            ];
+        }
+
+        $result = $this->configService->startWalletChange($config->id, $newWalletAddress, $cooldownMinutes);
+
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'message' => $isCn
+                    ? "✅ 钱包变更已启动\n\n" .
+                      "新钱包地址：{$newWalletAddress}\n" .
+                      "冷却时间：{$cooldownMinutes}分钟\n" .
+                      "结束时间：{$result['end_at']}\n\n" .
+                      "💡 冷却期间不接受新的投注，期满后自动完成变更"
+                    : "✅ Wallet change initiated\n\n" .
+                      "New Address: {$newWalletAddress}\n" .
+                      "Cooldown: {$cooldownMinutes} minutes\n" .
+                      "Ends at: {$result['end_at']}\n\n" .
+                      "💡 No new bets during cooldown, change completes automatically",
+            ];
+        }
+
         return [
             'success' => false,
-            'message' => $isCn ? '功能开发中' : 'Feature under development',
+            'message' => $result['message'],
         ];
     }
 
@@ -407,11 +673,34 @@ class TgBotCommandService
      */
     protected function handleCancelWalletChange(int $chatId, int $userId, bool $isCn): array
     {
-        // TODO: 验证管理员权限
-        // TODO: 实现取消钱包变更逻辑
+        // 验证管理员权限
+        if (!$this->isGroupAdmin($chatId, $userId)) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '❌ 只有管理员可以执行此操作' : '❌ Only administrators can perform this action',
+            ];
+        }
+
+        $config = $this->configService->getByTgChatId($chatId);
+        if (!$config) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '群组未配置' : 'Group not configured',
+            ];
+        }
+
+        $result = $this->configService->cancelWalletChange($config->id);
+
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'message' => $isCn ? '✅ 钱包变更已取消' : '✅ Wallet change cancelled',
+            ];
+        }
+
         return [
             'success' => false,
-            'message' => $isCn ? '功能开发中' : 'Feature under development',
+            'message' => $result['message'],
         ];
     }
 
@@ -420,7 +709,14 @@ class TgBotCommandService
      */
     protected function handleGroupConfig(int $chatId, int $userId, bool $isCn): array
     {
-        // TODO: 验证管理员权限
+        // 验证管理员权限
+        if (!$this->isGroupAdmin($chatId, $userId)) {
+            return [
+                'success' => false,
+                'message' => $isCn ? '❌ 只有管理员可以查看群组配置' : '❌ Only administrators can view group configuration',
+            ];
+        }
+
         $config = $this->configService->getByTgChatId($chatId);
         if (!$config) {
             return [

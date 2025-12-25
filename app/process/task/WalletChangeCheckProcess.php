@@ -3,6 +3,7 @@
 namespace app\process\task;
 
 use app\constants\TgGameGroupConfig as ConfigConst;
+use app\lib\helper\TelegramBotHelper;
 use app\repository\TgGameGroupConfigRepository;
 use app\service\TgGameGroupConfigService;
 use Carbon\Carbon;
@@ -45,6 +46,9 @@ class WalletChangeCheckProcess
      */
     protected function checkWalletChanges(): void
     {
+        // 确保数据库连接可用
+        $this->ensureDatabaseConnection();
+
         // 获取所有正在变更中的配置
         $changingConfigs = $this->configRepository->getChangingConfigs();
 
@@ -106,8 +110,8 @@ class WalletChangeCheckProcess
                 'archived_nodes' => $result['archived_nodes'],
             ]);
 
-            // TODO: 发送Telegram通知给群组管理员
-            // $this->sendTelegramNotification($config, $result);
+            // 发送Telegram通知给群组管理员
+            $this->sendTelegramNotification($config, $result);
         } else {
             Log::error("钱包变更完成失败", [
                 'group_id' => $config->id,
@@ -123,13 +127,56 @@ class WalletChangeCheckProcess
      */
     protected function sendTelegramNotification($config, array $result): void
     {
-        // TODO: 实现Telegram通知功能
-        // 需要使用TelegramBotHelper发送消息到群组
+        try {
+            $message = "🔄 钱包变更完成通知\n\n" .
+                      "群组：{$config->tg_group_name}\n" .
+                      "新钱包地址：{$result['new_address']}\n" .
+                      "钱包周期：#{$result['new_wallet_cycle']}\n" .
+                      "归档节点数：{$result['archived_nodes']}\n\n" .
+                      "✅ 钱包变更已完成，系统已恢复正常运行";
 
-        Log::info("发送Telegram通知: 钱包变更完成", [
-            'group_id' => $config->id,
-            'tg_chat_id' => $config->tg_chat_id,
-            'new_address' => $result['new_address'],
-        ]);
+            TelegramBotHelper::send($config->tg_chat_id, $message);
+
+            Log::info("发送Telegram通知成功", [
+                'group_id' => $config->id,
+                'tg_chat_id' => $config->tg_chat_id,
+                'new_address' => $result['new_address'],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("发送Telegram通知失败: " . $e->getMessage(), [
+                'group_id' => $config->id,
+                'tg_chat_id' => $config->tg_chat_id,
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * 确保数据库连接可用
+     * 处理 "MySQL server has gone away" 问题
+     */
+    protected function ensureDatabaseConnection(): void
+    {
+        try {
+            // 尝试执行简单查询来检查连接
+            \support\Db::connection()->select('SELECT 1');
+        } catch (\Throwable $e) {
+            // 如果连接失败，重新连接
+            Log::warning("数据库连接断开，正在重新连接...", [
+                'error' => $e->getMessage()
+            ]);
+
+            try {
+                // 断开当前连接
+                \support\Db::connection()->disconnect();
+                // 重新连接
+                \support\Db::connection()->reconnect();
+
+                Log::info("数据库重新连接成功");
+            } catch (\Throwable $reconnectError) {
+                Log::error("数据库重新连接失败: " . $reconnectError->getMessage());
+                throw $reconnectError;
+            }
+        }
     }
 }

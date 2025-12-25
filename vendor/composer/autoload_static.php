@@ -66,7 +66,6 @@ class ComposerStaticInitae90a1f34d9232b3e62b4e4ba9ff3f98
         ),
         'a' => 
         array (
-            'app\\View\\Components\\' => 20,
             'app\\' => 4,
         ),
         'Z' => 
@@ -210,6 +209,7 @@ class ComposerStaticInitae90a1f34d9232b3e62b4e4ba9ff3f98
         ),
         'E' => 
         array (
+            'Elliptic\\' => 9,
             'Egulias\\EmailValidator\\' => 23,
         ),
         'D' => 
@@ -233,6 +233,8 @@ class ComposerStaticInitae90a1f34d9232b3e62b4e4ba9ff3f98
         array (
             'Brick\\Math\\' => 11,
             'Base32\\' => 7,
+            'BN\\' => 3,
+            'BI\\' => 3,
         ),
         'A' => 
         array (
@@ -264,10 +266,6 @@ class ComposerStaticInitae90a1f34d9232b3e62b4e4ba9ff3f98
         'chillerlan\\QRCode\\' => 
         array (
             0 => __DIR__ . '/..' . '/chillerlan/php-qrcode/src',
-        ),
-        'app\\View\\Components\\' => 
-        array (
-            0 => __DIR__ . '/../..' . '/app/view/components',
         ),
         'app\\' => 
         array (
@@ -678,6 +676,10 @@ class ComposerStaticInitae90a1f34d9232b3e62b4e4ba9ff3f98
         array (
             0 => __DIR__ . '/..' . '/nikic/fast-route/src',
         ),
+        'Elliptic\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/simplito/elliptic-php/lib',
+        ),
         'Egulias\\EmailValidator\\' => 
         array (
             0 => __DIR__ . '/..' . '/egulias/email-validator/src',
@@ -733,6 +735,14 @@ class ComposerStaticInitae90a1f34d9232b3e62b4e4ba9ff3f98
         'Base32\\' => 
         array (
             0 => __DIR__ . '/..' . '/christian-riesen/base32/src',
+        ),
+        'BN\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/simplito/bn-php/lib',
+        ),
+        'BI\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/simplito/bigint-wrapper-php/lib',
         ),
         'Aws\\' => 
         array (
