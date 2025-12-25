@@ -13,7 +13,7 @@ class TelegramService
     private TelegramBot $telegramBot;
 
     #[Inject]
-    protected TelegramCommandService $commandService;
+    protected TgBotCommandService $commandService;
 
     #[Inject]
     protected TelegramCommandMessageRecordRepository $telegramCommandMessageRecordRepository;
@@ -35,7 +35,7 @@ class TelegramService
     {
         var_dump('======webHook params===', json_encode($params, JSON_UNESCAPED_UNICODE));
         $this->telegramBot->setData($params);
-        $this->commandService->setTelegramBot($this->telegramBot);
+        // 贪吃蛇游戏的TgBotCommandService不需要setTelegramBot，通过handleCommand的messageData参数传递信息
         //把信息进行分类，分开是私人聊天还是群内聊天
         $is_group = $this->telegramBot->messageFromGroup();
         var_dump('======webHook $is_group===', $is_group);
@@ -93,6 +93,8 @@ class TelegramService
             ], $this->telegramBot->MessageID());
         }
 
+        // 贪吃蛇游戏不支持图片处理功能（该功能属于旧支付系统）
+        /*
         if ($type === TelegramBot::PHOTO) {
             try {
                 $this->telegramCommandMessageRecordRepository->getModel()->firstOrCreate([
@@ -112,6 +114,8 @@ class TelegramService
             }
             return $this->sendMessageProducer($chat_id, $this->commandService->writeOffOrderByPhoto(), $replyID);
         }
+        */
+
 
         return false;
     }
@@ -129,16 +133,15 @@ class TelegramService
         $params = array_filter($params);
         // trim
         $params = array_map('trim', array_values($params));
-        if (method_exists($this->commandService, $method)) {
-            $data = [
-                'data'    => $this->telegramBot->getData(),
-                'params'  => $params,
-                'method'  => $method,
-                'command' => $command,
-            ];
-            return Redis::send(CommandEnum::TELEGRAM_COMMAND_RUN_QUEUE_NAME, $data);
-        }
-        return false;
+
+        // 所有命令都通过handleCommand统一处理，无需检查单独方法是否存在
+        $data = [
+            'data'    => $this->telegramBot->getData(),
+            'params'  => $params,
+            'method'  => $method,
+            'command' => $command,
+        ];
+        return Redis::send(CommandEnum::TELEGRAM_COMMAND_RUN_QUEUE_NAME, $data);
     }
 
     public function commandRunConsumer(array $data): bool
@@ -148,7 +151,7 @@ class TelegramService
             return false;
         }
         $this->telegramBot->setData($data['data']);
-        $this->commandService->setTelegramBot($this->telegramBot);
+        // 贪吃蛇游戏的TgBotCommandService不需要setTelegramBot
         $record = $this->telegramCommandMessageRecordRepository->getModel()->firstOrCreate([
             'chat_id'    => $this->telegramBot->ChatID(),
             'message_id' => $this->telegramBot->MessageID(),
@@ -161,12 +164,23 @@ class TelegramService
             'original_message' => $this->telegramBot->Text(),
         ]);
         try {
-            $result = $this->commandService->{$data['method']}($this->telegramBot->UserId(), $data['params'], $record->id);
+            // 构建消息数据
+            $messageData = [
+                'chat_id' => $this->telegramBot->ChatID(),
+                'from_user_id' => $this->telegramBot->UserId(),
+                'from_username' => $this->telegramBot->UserName(),
+            ];
+
+            // 调用统一的handleCommand方法
+            $result = $this->commandService->handleCommand($data['method'], $data['params'], $messageData);
+
+            // 提取消息内容
+            $message = $result['message'] ?? $result;
         } catch (\Throwable $e) {
             var_dump('------throwable==commandGroupRun--', $e->getMessage());
             return $this->returnException($this->telegramBot->ChatID(), $e, $record->id);
         }
-        return $this->sendMessageProducer($this->telegramBot->ChatID(), $result, $this->telegramBot->MessageID());
+        return $this->sendMessageProducer($this->telegramBot->ChatID(), $message, $this->telegramBot->MessageID());
     }
 
     public function privateWork(): void
