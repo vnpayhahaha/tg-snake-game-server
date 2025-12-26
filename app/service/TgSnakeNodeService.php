@@ -199,4 +199,208 @@ class TgSnakeNodeService extends BaseService
     {
         return $this->repository->countDailyNodes($groupId, $date);
     }
+
+    /**
+     * 根据凭证流水号查询（别名方法）
+     */
+    public function getBySerialNo(string $serialNo)
+    {
+        return $this->findByTicketSerialNo($serialNo);
+    }
+
+    /**
+     * 根据交易哈希查询（别名方法）
+     */
+    public function getByTxHash(string $txHash)
+    {
+        return $this->findByTxHash($txHash);
+    }
+
+    /**
+     * 获取群组的活跃节点（控制器使用）
+     */
+    public function getActiveNodesByGroup(int $groupId, int $limit = 100)
+    {
+        return $this->repository->getActiveNodes($groupId)->take($limit);
+    }
+
+    /**
+     * 根据钱包轮换周期获取节点
+     */
+    public function getNodesByWalletCycle(int $groupId, int $walletCycle)
+    {
+        $params = [
+            'group_id' => $groupId,
+            'wallet_cycle' => $walletCycle,
+        ];
+        return $this->repository->list($params);
+    }
+
+    /**
+     * 获取群组的归档节点
+     */
+    public function getArchivedNodesByGroup(int $groupId, int $limit = 100)
+    {
+        $params = [
+            'group_id' => $groupId,
+            'status' => NodeConst::STATUS_ARCHIVED,
+        ];
+        return $this->repository->list($params)->take($limit);
+    }
+
+    /**
+     * 根据玩家获取节点
+     */
+    public function getNodesByPlayer(string $playerAddress, int $groupId = null, int $limit = 50)
+    {
+        $query = Db::table('tg_snake_node')
+            ->where('player_address', $playerAddress);
+
+        if ($groupId) {
+            $query->where('group_id', $groupId);
+        }
+
+        return $query->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * 获取每日统计
+     */
+    public function getDailyStatistics(int $groupId = null, string $date = null): array
+    {
+        if (!$date) {
+            $date = date('Y-m-d');
+        }
+
+        $dateStart = $date . ' 00:00:00';
+        $dateEnd = $date . ' 23:59:59';
+
+        $query = Db::table('tg_snake_node')
+            ->whereBetween('created_at', [$dateStart, $dateEnd]);
+
+        if ($groupId) {
+            $query->where('group_id', $groupId);
+        }
+
+        $stats = [
+            'total_nodes' => (clone $query)->count(),
+            'active_nodes' => (clone $query)->where('status', NodeConst::STATUS_ACTIVE)->count(),
+            'archived_nodes' => (clone $query)->where('status', NodeConst::STATUS_ARCHIVED)->count(),
+            'matched_nodes' => (clone $query)->whereNotNull('matched_prize_id')->count(),
+            'total_amount' => (clone $query)->sum('amount'),
+        ];
+
+        return $stats;
+    }
+
+    /**
+     * 获取群组统计
+     */
+    public function getGroupStatistics(int $groupId, string $dateStart = null, string $dateEnd = null): array
+    {
+        $query = Db::table('tg_snake_node')
+            ->where('group_id', $groupId);
+
+        if ($dateStart) {
+            $query->where('created_at', '>=', $dateStart);
+        }
+
+        if ($dateEnd) {
+            $query->where('created_at', '<=', $dateEnd);
+        }
+
+        $stats = [
+            'total_nodes' => (clone $query)->count(),
+            'active_nodes' => (clone $query)->where('status', NodeConst::STATUS_ACTIVE)->count(),
+            'archived_nodes' => (clone $query)->where('status', NodeConst::STATUS_ARCHIVED)->count(),
+            'matched_nodes' => (clone $query)->whereNotNull('matched_prize_id')->count(),
+            'total_amount' => (clone $query)->sum('amount'),
+            'unique_players' => (clone $query)->distinct('player_address')->count('player_address'),
+        ];
+
+        return $stats;
+    }
+
+    /**
+     * 获取导出数据
+     */
+    public function getExportData(array $params, int $limit = 10000)
+    {
+        return $this->repository->list($params)->take($limit);
+    }
+
+    /**
+     * 归档单个节点
+     */
+    public function archiveNode(int $id): array
+    {
+        try {
+            $node = $this->repository->findById($id);
+            if (!$node) {
+                return [
+                    'success' => false,
+                    'message' => '节点不存在',
+                ];
+            }
+
+            if ($node->status == NodeConst::STATUS_ARCHIVED) {
+                return [
+                    'success' => false,
+                    'message' => '节点已归档',
+                ];
+            }
+
+            $this->repository->updateById($id, ['status' => NodeConst::STATUS_ARCHIVED]);
+
+            return [
+                'success' => true,
+                'message' => '节点已归档',
+            ];
+        } catch (\Exception $e) {
+            Log::error('归档节点失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 批量归档节点
+     */
+    public function batchArchiveNodes(array $nodeIds): array
+    {
+        try {
+            Db::beginTransaction();
+
+            $updated = Db::table('tg_snake_node')
+                ->whereIn('id', $nodeIds)
+                ->update(['status' => NodeConst::STATUS_ARCHIVED]);
+
+            Db::commit();
+
+            return [
+                'success' => true,
+                'message' => "已归档 {$updated} 个节点",
+                'count' => $updated,
+            ];
+        } catch (\Exception $e) {
+            Db::rollBack();
+            Log::error('批量归档节点失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 更新节点状态
+     */
+    public function updateStatus(int $id, int $status): bool
+    {
+        return $this->repository->updateById($id, ['status' => $status]);
+    }
 }

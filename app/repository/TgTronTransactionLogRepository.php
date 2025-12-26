@@ -237,4 +237,12 @@ class TgTronTransactionLogRepository extends IRepository
             ->where('created_at', '<', now()->subDays($daysAgo))
             ->delete();
     }
+
+    /**
+     * 根据交易哈希查询（别名方法）
+     */
+    public function findByTxHash(string $txHash): ?ModelTgTronTransactionLog
+    {
+        return $this->getByTxHash($txHash);
+    }
 }

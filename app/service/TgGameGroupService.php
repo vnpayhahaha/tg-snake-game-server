@@ -221,4 +221,76 @@ class TgGameGroupService extends BaseService
             'version' => $group->version,
         ];
     }
+
+    /**
+     * 获取群组当前蛇身
+     */
+    public function getCurrentSnake(int $id): array
+    {
+        $group = $this->repository->findById($id);
+        if (!$group) {
+            return [];
+        }
+
+        $currentNodeIds = $group->current_snake_nodes ? explode(',', $group->current_snake_nodes) : [];
+        $lastNodeIds = $group->last_snake_nodes ? explode(',', $group->last_snake_nodes) : [];
+
+        return [
+            'group_id' => $group->id,
+            'current_nodes' => $currentNodeIds,
+            'current_length' => count($currentNodeIds),
+            'last_nodes' => $lastNodeIds,
+            'last_length' => count($lastNodeIds),
+            'prize_pool_amount' => $group->prize_pool_amount,
+        ];
+    }
+
+    /**
+     * 重置群组奖池
+     */
+    public function resetPrizePool(int $id): array
+    {
+        try {
+            $group = $this->repository->findById($id);
+            if (!$group) {
+                return [
+                    'success' => false,
+                    'message' => '群组不存在',
+                ];
+            }
+
+            $result = $this->repository->updatePrizePool($id, 0);
+
+            return [
+                'success' => $result,
+                'message' => $result ? '奖池已重置' : '奖池重置失败',
+            ];
+        } catch (\Exception $e) {
+            Log::error('重置奖池失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 获取群组统计信息
+     */
+    public function getGroupStatistics(int $groupId = null): array
+    {
+        $query = Db::table('tg_game_group');
+
+        if ($groupId) {
+            $query->where('id', $groupId);
+        }
+
+        $stats = [
+            'total_groups' => (clone $query)->count(),
+            'total_prize_pool' => (clone $query)->sum('prize_pool_amount'),
+            'avg_prize_pool' => (clone $query)->avg('prize_pool_amount'),
+        ];
+
+        return $stats;
+    }
 }

@@ -428,4 +428,165 @@ class TgPrizeService extends BaseService
     {
         return $this->repository->getRecentPrizes($groupId, $limit);
     }
+
+    /**
+     * 获取待处理的中奖记录
+     */
+    public function getPendingRecords()
+    {
+        $params = ['status' => PrizeConst::STATUS_PENDING];
+        return $this->repository->list($params);
+    }
+
+    /**
+     * 获取转账中的记录
+     */
+    public function getTransferringRecords()
+    {
+        $params = ['status' => PrizeConst::STATUS_TRANSFERRING];
+        return $this->repository->list($params);
+    }
+
+    /**
+     * 获取导出数据
+     */
+    public function getExportData(array $params, int $limit = 10000)
+    {
+        return $this->repository->list($params)->take($limit);
+    }
+
+    /**
+     * 根据流水号获取中奖记录
+     */
+    public function getBySerialNo(string $serialNo)
+    {
+        return $this->repository->getBySerialNo($serialNo);
+    }
+
+    /**
+     * 根据群组ID获取中奖记录
+     */
+    public function getByGroupId(int $groupId, int $limit = 100)
+    {
+        $params = ['group_id' => $groupId];
+        return $this->repository->list($params)->take($limit);
+    }
+
+    /**
+     * 根据钱包轮换周期获取中奖记录
+     */
+    public function getByWalletCycle(string $walletCycleNo)
+    {
+        return Db::table('tg_prize_record')
+            ->where('wallet_cycle_no', $walletCycleNo)
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
+     * 获取每日统计
+     */
+    public function getDailyStatistics(int $groupId = null, string $date = null): array
+    {
+        if (!$date) {
+            $date = date('Y-m-d');
+        }
+
+        $dateStart = $date . ' 00:00:00';
+        $dateEnd = $date . ' 23:59:59';
+
+        return $this->getGroupStatistics($groupId, $dateStart, $dateEnd);
+    }
+
+    /**
+     * 获取中奖记录的转账列表
+     */
+    public function getPrizeTransfers(int $prizeRecordId)
+    {
+        return $this->transferRepository->getByPrizeId($prizeRecordId);
+    }
+
+    /**
+     * 批量重试失败的转账
+     */
+    public function batchRetryFailedTransfers(int $prizeRecordId): array
+    {
+        try {
+            $transfers = $this->transferRepository->getByPrizeId($prizeRecordId);
+            $failedTransfers = $transfers->filter(function ($transfer) {
+                return $transfer->status == TransferConst::STATUS_FAILED;
+            });
+
+            if ($failedTransfers->isEmpty()) {
+                return [
+                    'success' => false,
+                    'message' => '没有失败的转账需要重试',
+                ];
+            }
+
+            $retryCount = 0;
+            foreach ($failedTransfers as $transfer) {
+                // 重置状态为待处理
+                $this->transferRepository->updateStatus($transfer->id, TransferConst::STATUS_PENDING);
+                $retryCount++;
+            }
+
+            return [
+                'success' => true,
+                'message' => "已重试 {$retryCount} 笔转账",
+                'retry_count' => $retryCount,
+            ];
+        } catch (\Exception $e) {
+            Log::error('批量重试转账失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 重新处理中奖记录
+     */
+    public function reprocessPrize(int $id): array
+    {
+        try {
+            $prizeRecord = $this->repository->findById($id);
+            if (!$prizeRecord) {
+                return [
+                    'success' => false,
+                    'message' => '中奖记录不存在',
+                ];
+            }
+
+            if ($prizeRecord->status == PrizeConst::STATUS_COMPLETED) {
+                return [
+                    'success' => false,
+                    'message' => '已完成的记录无需重新处理',
+                ];
+            }
+
+            // 重置状态
+            $this->repository->updateById($id, ['status' => PrizeConst::STATUS_PENDING]);
+
+            return [
+                'success' => true,
+                'message' => '已重新加入处理队列',
+            ];
+        } catch (\Exception $e) {
+            Log::error('重新处理中奖记录失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 更新中奖记录状态
+     */
+    public function updateStatus(int $id, int $status): bool
+    {
+        return $this->repository->updateById($id, ['status' => $status]);
+    }
 }

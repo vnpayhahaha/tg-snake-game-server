@@ -87,17 +87,41 @@ class TgPrizeTransferService extends BaseService
     /**
      * 标记转账成功
      */
-    public function markAsSuccess(int $id, string $txHash): bool
+    public function markAsSuccess(int $id, string $txHash = null): array
     {
-        return $this->repository->updateStatus($id, TransferConst::STATUS_SUCCESS, $txHash);
+        try {
+            $result = $this->repository->updateStatus($id, TransferConst::STATUS_SUCCESS, $txHash);
+            return [
+                'success' => $result,
+                'message' => $result ? '标记成功' : '标记失败',
+            ];
+        } catch (\Exception $e) {
+            Log::error('标记转账成功失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
     }
 
     /**
      * 标记转账失败并增加重试次数
      */
-    public function markAsFailed(int $id, string $errorMessage): bool
+    public function markAsFailed(int $id, string $errorMessage): array
     {
-        return $this->repository->incrementRetryCount($id, $errorMessage);
+        try {
+            $result = $this->repository->incrementRetryCount($id, $errorMessage);
+            return [
+                'success' => $result,
+                'message' => $result ? '标记失败成功' : '标记失败失败',
+            ];
+        } catch (\Exception $e) {
+            Log::error('标记转账失败失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
     }
 
     /**
@@ -170,5 +194,137 @@ class TgPrizeTransferService extends BaseService
     public function batchUpdateStatus(array $ids, int $status): int
     {
         return $this->repository->batchUpdateStatus($ids, $status);
+    }
+
+    /**
+     * 根据节点ID获取转账
+     */
+    public function getByNodeId(int $nodeId)
+    {
+        return Db::table('tg_prize_transfer')
+            ->where('node_id', $nodeId)
+            ->first();
+    }
+
+    /**
+     * 根据交易哈希获取转账
+     */
+    public function getByTxHash(string $txHash)
+    {
+        return Db::table('tg_prize_transfer')
+            ->where('tx_hash', $txHash)
+            ->first();
+    }
+
+    /**
+     * 获取导出数据
+     */
+    public function getExportData(array $params, int $limit = 10000)
+    {
+        return $this->repository->list($params)->take($limit);
+    }
+
+    /**
+     * 重试转账
+     */
+    public function retryTransfer(int $id): array
+    {
+        try {
+            $transfer = $this->repository->findById($id);
+            if (!$transfer) {
+                return [
+                    'success' => false,
+                    'message' => '转账记录不存在',
+                ];
+            }
+
+            if ($transfer->status == TransferConst::STATUS_SUCCESS) {
+                return [
+                    'success' => false,
+                    'message' => '转账已成功，无需重试',
+                ];
+            }
+
+            if ($transfer->retry_count >= TransferConst::MAX_RETRY_COUNT) {
+                return [
+                    'success' => false,
+                    'message' => '已达到最大重试次数',
+                ];
+            }
+
+            // 重置状态为待处理
+            $this->repository->updateStatus($id, TransferConst::STATUS_PENDING);
+
+            return [
+                'success' => true,
+                'message' => '已重新加入处理队列',
+            ];
+        } catch (\Exception $e) {
+            Log::error('重试转账失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 批量重试转账
+     */
+    public function batchRetryTransfers(array $transferIds): array
+    {
+        try {
+            Db::beginTransaction();
+
+            $successCount = 0;
+            $failedCount = 0;
+            $errors = [];
+
+            foreach ($transferIds as $id) {
+                $result = $this->retryTransfer($id);
+                if ($result['success']) {
+                    $successCount++;
+                } else {
+                    $failedCount++;
+                    $errors[] = [
+                        'id' => $id,
+                        'error' => $result['message'],
+                    ];
+                }
+            }
+
+            Db::commit();
+
+            return [
+                'success' => true,
+                'total' => count($transferIds),
+                'success_count' => $successCount,
+                'failed_count' => $failedCount,
+                'errors' => $errors,
+            ];
+        } catch (\Exception $e) {
+            Db::rollBack();
+            Log::error('批量重试转账失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 根据中奖ID获取转账（别名）
+     */
+    public function getByPrizeId(int $prizeRecordId)
+    {
+        return $this->getByPrizeRecordId($prizeRecordId);
+    }
+
+    /**
+     * 根据地址获取转账（别名）
+     */
+    public function getByAddress(string $address, int $limit = 50)
+    {
+        return $this->getByPlayerAddress($address, $limit);
     }
 }

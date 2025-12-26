@@ -183,4 +183,155 @@ class TgPlayerWalletBindingService extends BaseService
     {
         return $this->repository->countGroupBindings($groupId);
     }
+
+    /**
+     * 根据TG用户ID获取用户绑定
+     */
+    public function getUserByTgUserId(int $groupId, int $tgUserId)
+    {
+        return $this->repository->getByTgUserId($groupId, $tgUserId);
+    }
+
+    /**
+     * 根据群组ID获取所有绑定
+     */
+    public function getByGroupId(int $groupId)
+    {
+        return $this->repository->getGroupBindings($groupId);
+    }
+
+    /**
+     * 获取玩家的参与节点
+     */
+    public function getPlayerNodes(int $groupId, int $tgUserId)
+    {
+        $binding = $this->repository->getByTgUserId($groupId, $tgUserId);
+        if (!$binding) {
+            return [];
+        }
+
+        // 查询该玩家的所有节点
+        return Db::table('tg_snake_node')
+            ->where('group_id', $groupId)
+            ->where('wallet_address', $binding->wallet_address)
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
+     * 获取玩家统计信息
+     */
+    public function getPlayerStatistics(int $groupId, int $tgUserId): array
+    {
+        $binding = $this->repository->getByTgUserId($groupId, $tgUserId);
+        if (!$binding) {
+            return [
+                'total_nodes' => 0,
+                'active_nodes' => 0,
+                'archived_nodes' => 0,
+                'total_amount' => 0,
+            ];
+        }
+
+        $walletAddress = $binding->wallet_address;
+
+        $totalNodes = Db::table('tg_snake_node')
+            ->where('group_id', $groupId)
+            ->where('wallet_address', $walletAddress)
+            ->count();
+
+        $activeNodes = Db::table('tg_snake_node')
+            ->where('group_id', $groupId)
+            ->where('wallet_address', $walletAddress)
+            ->where('status', 1) // 假设1是活跃状态
+            ->count();
+
+        $archivedNodes = Db::table('tg_snake_node')
+            ->where('group_id', $groupId)
+            ->where('wallet_address', $walletAddress)
+            ->where('status', 2) // 假设2是归档状态
+            ->count();
+
+        $totalAmount = Db::table('tg_snake_node')
+            ->where('group_id', $groupId)
+            ->where('wallet_address', $walletAddress)
+            ->sum('amount');
+
+        return [
+            'total_nodes' => $totalNodes,
+            'active_nodes' => $activeNodes,
+            'archived_nodes' => $archivedNodes,
+            'total_amount' => $totalAmount,
+        ];
+    }
+
+    /**
+     * 获取绑定变更日志
+     */
+    public function getBindingLogs(int $groupId, int $tgUserId, int $limit = 20)
+    {
+        return $this->bindingLogRepository->getUserBindingHistory($groupId, $tgUserId, $limit);
+    }
+
+    /**
+     * 批量绑定钱包
+     */
+    public function batchBindWallets(int $groupId, array $bindings): array
+    {
+        try {
+            Db::beginTransaction();
+
+            $successCount = 0;
+            $failedCount = 0;
+            $errors = [];
+
+            foreach ($bindings as $index => $bindingData) {
+                try {
+                    $result = $this->bindWallet([
+                        'group_id' => $groupId,
+                        'tg_user_id' => $bindingData['tg_user_id'],
+                        'tg_username' => $bindingData['tg_username'] ?? null,
+                        'tg_first_name' => $bindingData['tg_first_name'] ?? null,
+                        'tg_last_name' => $bindingData['tg_last_name'] ?? null,
+                        'wallet_address' => $bindingData['wallet_address'],
+                    ]);
+
+                    if ($result['success']) {
+                        $successCount++;
+                    } else {
+                        $failedCount++;
+                        $errors[] = [
+                            'index' => $index,
+                            'tg_user_id' => $bindingData['tg_user_id'],
+                            'error' => $result['message'],
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    $failedCount++;
+                    $errors[] = [
+                        'index' => $index,
+                        'tg_user_id' => $bindingData['tg_user_id'],
+                        'error' => $e->getMessage(),
+                    ];
+                }
+            }
+
+            Db::commit();
+
+            return [
+                'success' => true,
+                'total' => count($bindings),
+                'success_count' => $successCount,
+                'failed_count' => $failedCount,
+                'errors' => $errors,
+            ];
+        } catch (\Exception $e) {
+            Db::rollBack();
+            Log::error('批量绑定钱包失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
 }

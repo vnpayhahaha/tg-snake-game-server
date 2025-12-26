@@ -348,4 +348,157 @@ class TgTronMonitorService extends BaseService
             // 通知发送失败不影响主流程，只记录日志
         }
     }
+
+    /**
+     * 获取未处理的交易日志
+     */
+    public function getUnprocessedLogs(int $groupId = null)
+    {
+        $params = ['processed' => TxLogConst::PROCESSED_NO];
+        if ($groupId) {
+            $params['group_id'] = $groupId;
+        }
+        return $this->repository->list($params);
+    }
+
+    /**
+     * 获取无效的交易日志
+     */
+    public function getInvalidLogs(int $groupId = null)
+    {
+        $params = ['is_valid' => TxLogConst::VALID_NO];
+        if ($groupId) {
+            $params['group_id'] = $groupId;
+        }
+        return $this->repository->list($params);
+    }
+
+    /**
+     * 获取每日统计
+     */
+    public function getDailyStatistics(int $groupId = null, string $date = null): array
+    {
+        if (!$date) {
+            $date = date('Y-m-d');
+        }
+
+        $dateStart = $date . ' 00:00:00';
+        $dateEnd = $date . ' 23:59:59';
+
+        return $this->getTransactionStatistics($groupId, $dateStart, $dateEnd);
+    }
+
+    /**
+     * 获取导出数据
+     */
+    public function getExportData(array $params, int $limit = 10000)
+    {
+        return $this->repository->list($params)->take($limit);
+    }
+
+    /**
+     * 重新处理交易
+     */
+    public function reprocessTransaction(int $id): array
+    {
+        try {
+            $txLog = $this->repository->findById($id);
+            if (!$txLog) {
+                return [
+                    'success' => false,
+                    'message' => '交易日志不存在',
+                ];
+            }
+
+            if ($txLog->processed == TxLogConst::PROCESSED_YES) {
+                return [
+                    'success' => false,
+                    'message' => '交易已处理过',
+                ];
+            }
+
+            // 重新处理
+            $result = $this->processIncomingTransaction($txLog->group_id, [
+                'tx_hash' => $txLog->tx_hash,
+                'from_address' => $txLog->from_address,
+                'to_address' => $txLog->to_address,
+                'amount' => $txLog->amount,
+                'block_height' => $txLog->block_height,
+                'block_timestamp' => $txLog->block_timestamp,
+                'status' => $txLog->status,
+            ]);
+
+            return $result;
+        } catch (\Exception $e) {
+            Log::error('重新处理交易失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 手动同步区块链交易
+     */
+    public function syncTransactions(int $groupId = null, int $startBlock = null, int $endBlock = null): array
+    {
+        try {
+            // 这是一个占位方法，实际实现需要调用TRON API
+            // 这里只返回一个基本响应
+            return [
+                'success' => true,
+                'message' => '同步功能需要实现TRON API调用',
+                'group_id' => $groupId,
+                'start_block' => $startBlock,
+                'end_block' => $endBlock,
+            ];
+        } catch (\Exception $e) {
+            Log::error('同步交易失败: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 根据群组ID获取交易
+     */
+    public function getByGroupId(int $groupId, int $limit = 100)
+    {
+        $params = ['group_id' => $groupId];
+        return $this->repository->list($params)->take($limit);
+    }
+
+    /**
+     * 根据交易哈希获取
+     */
+    public function getByTxHash(string $txHash)
+    {
+        return $this->repository->findByTxHash($txHash);
+    }
+
+    /**
+     * 根据地址获取交易
+     */
+    public function getByAddress(string $address, string $direction = null, int $limit = 50)
+    {
+        $query = Db::table('tg_tron_transaction_log');
+
+        if ($direction === 'from') {
+            $query->where('from_address', $address);
+        } elseif ($direction === 'to') {
+            $query->where('to_address', $address);
+        } else {
+            $query->where(function ($q) use ($address) {
+                $q->where('from_address', $address)
+                  ->orWhere('to_address', $address);
+            });
+        }
+
+        return $query->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
 }

@@ -226,4 +226,12 @@ class TgPrizeTransferRepository extends IRepository
             ->where('status', TransferConst::STATUS_SUCCESS)
             ->sum('amount');
     }
+
+    /**
+     * 根据中奖ID获取转账列表（别名方法）
+     */
+    public function getByPrizeId(int $prizeRecordId): Collection
+    {
+        return $this->getByPrizeRecordId($prizeRecordId);
+    }
 }
