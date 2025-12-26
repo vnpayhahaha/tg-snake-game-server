@@ -196,12 +196,12 @@ class TgPlayerWalletBindingController extends BasicController
         }
 
         $validatedData = $validator->validate();
-        $result = $this->service->bindWallet(
-            $validatedData['group_id'],
-            $validatedData['tg_user_id'],
-            $validatedData['tg_username'] ?? null,
-            $validatedData['wallet_address']
-        );
+        $result = $this->service->bindWallet([
+            'group_id' => $validatedData['group_id'],
+            'tg_user_id' => $validatedData['tg_user_id'],
+            'tg_username' => $validatedData['tg_username'] ?? '',
+            'wallet_address' => $validatedData['wallet_address'],
+        ]);
 
         return $result['success']
             ? $this->success(data: $result)

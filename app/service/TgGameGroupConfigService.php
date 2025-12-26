@@ -6,6 +6,7 @@ use app\constants\TgGameGroupConfig as ConfigConst;
 use app\repository\TgGameGroupConfigRepository;
 use app\repository\TgGameGroupConfigLogRepository;
 use app\repository\TgSnakeNodeRepository;
+use app\repository\TgGameGroupRepository;
 use DI\Attribute\Inject;
 use Carbon\Carbon;
 use support\Db;
@@ -25,6 +26,56 @@ class TgGameGroupConfigService extends BaseService
 
     #[Inject]
     protected TgSnakeNodeRepository $snakeNodeRepository;
+
+    #[Inject]
+    protected TgGameGroupRepository $gameGroupRepository;
+
+    /**
+     * 创建群组配置（覆写父类方法）
+     * 自动创建对应的游戏群组并记录日志
+     */
+    public function create(array $data): mixed
+    {
+        try {
+            Db::beginTransaction();
+
+            // 创建配置
+            $config = $this->repository->create($data);
+
+            // 记录创建日志
+            $this->logConfigChange($config, $data, $data['change_source'] ?? 1);
+
+            // 自动创建对应的游戏群组
+            $this->gameGroupRepository->create([
+                'config_id' => $config->id,
+                'tg_chat_id' => $config->tg_chat_id,
+                'prize_pool_amount' => 0,
+                'current_snake_nodes' => '',
+                'last_snake_nodes' => '',
+                'last_prize_nodes' => '',
+                'last_prize_amount' => 0,
+                'last_prize_address' => '',
+                'last_prize_serial_no' => '',
+                'last_prize_at' => null,
+                'version' => 1,
+            ]);
+
+            Log::info('创建群组配置成功并自动创建游戏群组', [
+                'config_id' => $config->id,
+                'tg_chat_id' => $config->tg_chat_id,
+            ]);
+
+            Db::commit();
+            return $config;
+        } catch (\Exception $e) {
+            Db::rollBack();
+            Log::error('创建群组配置失败: ' . $e->getMessage(), [
+                'data' => $data,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
 
     /**
      * 根据Telegram群组ID获取配置
@@ -274,20 +325,41 @@ class TgGameGroupConfigService extends BaseService
     protected function logConfigChange($oldConfig, array $newData, int $changeSource = 1): void
     {
         try {
-            $this->configLogRepository->logConfigChange([
-                'config_id' => $oldConfig->id,
-                'tg_chat_id' => $oldConfig->tg_chat_id,
-                'change_params' => json_encode($newData),
-                'old_config' => json_encode($oldConfig->toArray()),
-                'new_config' => json_encode(array_merge($oldConfig->toArray(), $newData)),
-                'operator' => $this->getCurrentUserName() ?: 'system',
-                'operator_ip' => $this->getOperatorIp(),
-                'change_source' => $changeSource,
-                'tg_message_id' => null,
-            ]);
+            // 如果是创建操作（oldConfig为空或没有id），特殊处理
+            $isCreate = !$oldConfig || !isset($oldConfig->id);
+
+            if ($isCreate) {
+                // 创建场景：oldConfig就是新创建的配置对象
+                $configData = is_array($oldConfig) ? $oldConfig : (is_object($oldConfig) ? $oldConfig->toArray() : []);
+
+                $this->configLogRepository->logConfigChange([
+                    'config_id' => $configData['id'] ?? null,
+                    'tg_chat_id' => $configData['tg_chat_id'] ?? null,
+                    'change_params' => json_encode($newData),
+                    'old_config' => null,  // 创建时没有旧配置
+                    'new_config' => json_encode($configData),
+                    'operator' => $this->getCurrentUserName() ?: 'system',
+                    'operator_ip' => $this->getOperatorIp(),
+                    'change_source' => $changeSource,
+                    'tg_message_id' => null,
+                ]);
+            } else {
+                // 更新场景：正常记录变更
+                $this->configLogRepository->logConfigChange([
+                    'config_id' => $oldConfig->id,
+                    'tg_chat_id' => $oldConfig->tg_chat_id,
+                    'change_params' => json_encode($newData),
+                    'old_config' => json_encode($oldConfig->toArray()),
+                    'new_config' => json_encode(array_merge($oldConfig->toArray(), $newData)),
+                    'operator' => $this->getCurrentUserName() ?: 'system',
+                    'operator_ip' => $this->getOperatorIp(),
+                    'change_source' => $changeSource,
+                    'tg_message_id' => null,
+                ]);
+            }
         } catch (\Throwable $e) {
             Log::warning("记录配置变更日志失败: " . $e->getMessage(), [
-                'config_id' => $oldConfig->id,
+                'config_id' => $oldConfig->id ?? null,
                 'error' => $e->getMessage(),
             ]);
         }

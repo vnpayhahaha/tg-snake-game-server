@@ -133,7 +133,7 @@ class TgPlayerWalletBindingService extends BaseService
                 'tg_last_name' => $binding->tg_last_name ?? '',
                 'old_wallet_address' => $binding->wallet_address,
                 'new_wallet_address' => '',
-                'change_type' => BindingLogConst::CHANGE_TYPE_UPDATE_BIND,
+                'change_type' => BindingLogConst::CHANGE_TYPE_UNBIND,
             ]);
 
             Db::commit();

@@ -172,6 +172,7 @@ class TgGameGroupConfigController extends BasicController
             $validatedData,
             [
                 'created_by' => $request->user->id,
+                'change_source' => 1,  // 来源：管理后台
             ]
         ));
 

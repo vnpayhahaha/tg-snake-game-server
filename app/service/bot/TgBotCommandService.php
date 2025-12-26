@@ -905,7 +905,7 @@ class TgBotCommandService
                 // 更新租户ID
                 $this->configService->updateConfig($config->id, [
                     'tenant_id' => $tenantId,
-                ]);
+                ], 2);  // change_source = 2 (Telegram Bot)
 
                 $message = $isCn
                     ? "✅ 租户ID已更新\n\n" .
@@ -924,7 +924,7 @@ class TgBotCommandService
                       ($config->wallet_address ? "✅ Group configured, game is ready" : "⚠️ Please set wallet: /set_wallet TRON_ADDRESS");
             } else {
                 // 创建新配置，并将执行绑定的用户设为首位管理员
-                $newConfig = \app\model\ModelTgGameGroupConfig::create([
+                $newConfig = $this->configService->create([
                     'tenant_id' => $tenantId,
                     'tg_chat_id' => $chatId,
                     'tg_chat_title' => 'Unknown', // 会在webhook中更新为实际群组名称
@@ -935,12 +935,14 @@ class TgBotCommandService
                     'wallet_change_status' => 1,
                     'telegram_admin_whitelist' => (string)$userId, // 将绑定者设为首位管理员
                     'status' => 0, // 初始状态为禁用，需要设置钱包后才能启用
+                    'change_source' => 2,  // 来源：Telegram Bot
                 ]);
 
-                Log::info("租户绑定成功，用户自动成为管理员", [
+                Log::info("租户绑定成功，用户自动成为管理员，已自动创建游戏群组和日志", [
                     'chat_id' => $chatId,
                     'user_id' => $userId,
                     'tenant_id' => $tenantId,
+                    'config_id' => $newConfig->id,
                 ]);
 
                 $message = $isCn
@@ -1043,7 +1045,7 @@ class TgBotCommandService
                 'wallet_address' => $walletAddress,
                 'wallet_change_count' => $config->wallet_change_count + 1,
                 'status' => 1, // 设置钱包后自动启用
-            ]);
+            ], 2);  // change_source = 2 (Telegram Bot)
 
             $message = $isCn
                 ? "✅ 收款钱包地址已设置\n\n" .
@@ -1142,7 +1144,7 @@ class TgBotCommandService
             // 更新投注金额
             $this->configService->updateConfig($config->id, [
                 'bet_amount' => $betAmount,
-            ]);
+            ], 2);  // change_source = 2 (Telegram Bot)
 
             $message = $isCn
                 ? "✅ 投注金额已更新\n\n" .
@@ -1228,8 +1230,10 @@ class TgBotCommandService
                 ];
             }
 
-            // 保存到数据库
-            $config->save();
+            // 通过Service保存并记录日志
+            $this->configService->updateConfig($config->id, [
+                'telegram_admin_whitelist' => $config->telegram_admin_whitelist,
+            ], 2);  // change_source = 2 (Telegram Bot)
 
             $message = $isCn
                 ? "✅ 已添加到管理员白名单\n\n" .
@@ -1315,8 +1319,10 @@ class TgBotCommandService
                 ];
             }
 
-            // 保存到数据库
-            $config->save();
+            // 通过Service保存并记录日志
+            $this->configService->updateConfig($config->id, [
+                'telegram_admin_whitelist' => $config->telegram_admin_whitelist,
+            ], 2);  // change_source = 2 (Telegram Bot)
 
             $message = $isCn
                 ? "✅ 已从管理员白名单移除\n\n" .

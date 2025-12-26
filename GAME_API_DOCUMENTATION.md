@@ -42,6 +42,7 @@
 8. [中奖转账管理](#8-中奖转账管理)
 9. [派奖队列管理](#9-派奖队列管理)
 10. [TRON交易日志](#10-tron交易日志)
+11. [Telegram命令消息记录](#11-telegram命令消息记录)
 
 ---
 
@@ -156,7 +157,34 @@
 }
 ```
 
-### 1.4 创建游戏群组
+### 1.4 获取群组当前蛇身
+
+**接口地址：** `GET /admin/tg_game/group/{id}/snake`
+
+**权限代码：** `tg_game:group:snake`
+
+**路径参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| id | integer | 是 | 群组ID |
+
+**响应示例：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "group_id": 1,
+    "current_nodes": [1, 2, 3, 4, 5],
+    "current_length": 5,
+    "last_nodes": [10, 11, 12, 13],
+    "last_length": 4,
+    "prize_pool_amount": 1000.50
+  }
+}
+```
+
+### 1.5 创建游戏群组
 
 **接口地址：** `POST /admin/tg_game/group`
 
@@ -2140,6 +2168,315 @@
     "valid_count": 145,
     "invalid_count": 5
   }
+}
+```
+
+---
+
+## 11. Telegram命令消息记录
+
+### 11.1 获取命令消息记录列表
+
+**接口地址：** `GET /admin/tg_game/command_message/list`
+
+**权限代码：** `tg_game:command_message:list`
+
+**请求参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| page | integer | 否 | 页码，默认1 |
+| limit | integer | 否 | 每页数量，默认10 |
+| group_id | integer | 否 | 群组ID |
+| tg_user_id | integer | 否 | Telegram用户ID |
+| command | string | 否 | 命令类型 |
+| is_success | integer | 否 | 是否成功：0-否，1-是 |
+
+**响应示例：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "total": 500,
+    "per_page": 10,
+    "current_page": 1,
+    "data": [
+      {
+        "id": 1,
+        "group_id": 1,
+        "tg_chat_id": -1001234567890,
+        "tg_user_id": 123456789,
+        "tg_username": "testuser",
+        "command": "/bet",
+        "message_text": "/bet 100",
+        "response_text": "投注成功",
+        "is_success": 1,
+        "error_message": null,
+        "created_at": "2025-01-08 10:00:00"
+      }
+    ]
+  }
+}
+```
+
+### 11.2 根据群组ID查询命令消息
+
+**接口地址：** `GET /admin/tg_game/command_message/by_group/{groupId}`
+
+**权限代码：** `tg_game:command_message:byGroup`
+
+**路径参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| groupId | integer | 是 | 群组ID |
+
+**请求参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| limit | integer | 否 | 数量限制，默认100 |
+
+**响应示例：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 1,
+      "tg_user_id": 123456789,
+      "tg_username": "testuser",
+      "command": "/bet",
+      "message_text": "/bet 100",
+      "is_success": 1,
+      "created_at": "2025-01-08 10:00:00"
+    }
+  ]
+}
+```
+
+### 11.3 根据TG用户ID查询命令消息
+
+**接口地址：** `GET /admin/tg_game/command_message/by_user/{tgUserId}`
+
+**权限代码：** `tg_game:command_message:byUser`
+
+**路径参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| tgUserId | integer | 是 | Telegram用户ID |
+
+**请求参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| limit | integer | 否 | 数量限制，默认50 |
+
+**响应示例：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 1,
+      "group_id": 1,
+      "command": "/bet",
+      "message_text": "/bet 100",
+      "response_text": "投注成功",
+      "is_success": 1,
+      "created_at": "2025-01-08 10:00:00"
+    }
+  ]
+}
+```
+
+### 11.4 根据命令类型查询消息
+
+**接口地址：** `GET /admin/tg_game/command_message/by_command/{command}`
+
+**权限代码：** `tg_game:command_message:byCommand`
+
+**路径参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| command | string | 是 | 命令类型（如：bet, bind, withdraw等） |
+
+**请求参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| limit | integer | 否 | 数量限制，默认100 |
+
+**响应示例：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 1,
+      "group_id": 1,
+      "tg_user_id": 123456789,
+      "tg_username": "testuser",
+      "message_text": "/bet 100",
+      "response_text": "投注成功",
+      "is_success": 1,
+      "created_at": "2025-01-08 10:00:00"
+    }
+  ]
+}
+```
+
+### 11.5 获取命令消息统计
+
+**接口地址：** `GET /admin/tg_game/command_message/statistics`
+
+**权限代码：** `tg_game:command_message:statistics`
+
+**请求参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| group_id | integer | 否 | 群组ID |
+| date_start | string | 否 | 开始日期(YYYY-MM-DD) |
+| date_end | string | 否 | 结束日期(YYYY-MM-DD) |
+
+**响应示例：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "total_messages": 1000,
+    "success_messages": 950,
+    "failed_messages": 50,
+    "commands_breakdown": {
+      "bet": 500,
+      "bind": 200,
+      "withdraw": 150,
+      "query": 150
+    }
+  }
+}
+```
+
+### 11.6 获取当日命令消息统计
+
+**接口地址：** `GET /admin/tg_game/command_message/daily_statistics`
+
+**权限代码：** `tg_game:command_message:dailyStatistics`
+
+**请求参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| group_id | integer | 否 | 群组ID |
+| date | string | 否 | 日期(YYYY-MM-DD)，默认今天 |
+
+**响应示例：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "date": "2025-01-08",
+    "total_messages": 100,
+    "success_messages": 95,
+    "failed_messages": 5,
+    "hourly_breakdown": [
+      {"hour": 0, "count": 5},
+      {"hour": 1, "count": 3},
+      {"hour": 10, "count": 20}
+    ]
+  }
+}
+```
+
+### 11.7 导出命令消息记录
+
+**接口地址：** `GET /admin/tg_game/command_message/export`
+
+**权限代码：** `tg_game:command_message:export`
+
+**请求参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| group_id | integer | 否 | 群组ID |
+| tg_user_id | integer | 否 | Telegram用户ID |
+| command | string | 否 | 命令类型 |
+| is_success | integer | 否 | 是否成功 |
+| date_start | string | 否 | 开始日期 |
+| date_end | string | 否 | 结束日期 |
+
+**响应：** Excel文件下载
+
+### 11.8 获取命令消息详情
+
+**接口地址：** `GET /admin/tg_game/command_message/{id}`
+
+**权限代码：** `tg_game:command_message:detail`
+
+**路径参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| id | integer | 是 | 消息记录ID |
+
+**响应示例：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 1,
+    "group_id": 1,
+    "group_name": "贪吃蛇游戏群",
+    "tg_chat_id": -1001234567890,
+    "tg_user_id": 123456789,
+    "tg_username": "testuser",
+    "command": "/bet",
+    "message_text": "/bet 100 TRX",
+    "response_text": "投注成功！您的票号为：ABC123",
+    "is_success": 1,
+    "error_message": null,
+    "created_at": "2025-01-08 10:00:00",
+    "updated_at": "2025-01-08 10:00:00"
+  }
+}
+```
+
+### 11.9 删除命令消息（软删除）
+
+**接口地址：** `DELETE /admin/tg_game/command_message`
+
+**权限代码：** `tg_game:command_message:delete`
+
+**请求参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| ids | array | 是 | 消息ID数组 |
+
+**响应示例：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+### 11.10 真实删除命令消息
+
+**接口地址：** `DELETE /admin/tg_game/command_message/real_delete`
+
+**权限代码：** `tg_game:command_message:realDelete`
+
+**请求参数：**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| ids | array | 是 | 消息ID数组 |
+
+**响应示例：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
 }
 ```
 
