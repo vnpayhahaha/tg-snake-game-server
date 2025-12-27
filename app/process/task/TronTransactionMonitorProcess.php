@@ -60,6 +60,9 @@ class TronTransactionMonitorProcess
 
         Log::info("TronTransactionMonitorProcess: 开始监控 {$activeConfigs->count()} 个群组");
 
+        $groupIndex = 0;
+        $totalGroups = $activeConfigs->count();
+
         foreach ($activeConfigs as $config) {
             try {
                 $this->monitorGroupTransactions($config);
@@ -68,6 +71,13 @@ class TronTransactionMonitorProcess
                     'group_id' => $config->id,
                     'wallet_address' => $config->wallet_address,
                 ]);
+            }
+
+            // 在群组之间添加延迟，避免触发TronGrid API速率限制（每秒3次）
+            // 最后一个群组不需要延迟
+            $groupIndex++;
+            if ($groupIndex < $totalGroups) {
+                usleep(500000); // 500毫秒延迟
             }
         }
 

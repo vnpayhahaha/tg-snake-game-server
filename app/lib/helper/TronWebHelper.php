@@ -538,9 +538,10 @@ class TronWebHelper
      * @param string $address 钱包地址
      * @param int $minBlockHeight 最小区块高度（从此高度开始查询）
      * @param int $limit 返回记录数限制
+     * @param int $maxRetries 最大重试次数（用于处理429速率限制）
      * @return array 交易列表
      */
-    public function getTransactionHistory(string $address, int $minBlockHeight = 0, int $limit = 200): array
+    public function getTransactionHistory(string $address, int $minBlockHeight = 0, int $limit = 200, int $maxRetries = 3): array
     {
         // 验证地址格式
         if (!self::isValidAddress($address)) {
@@ -550,47 +551,85 @@ class TronWebHelper
             return [];
         }
 
-        try {
-            $params = [
-                'only_confirmed' => 'true',
-                'only_to' => 'true',    // 只获取转入交易
-                'limit' => min($limit, 200), // TronGrid API最大支持200
-            ];
+        $retryCount = 0;
+        $lastException = null;
 
-            $queryString = http_build_query($params);
-            $url = $this->apiUrl . "/v1/accounts/{$address}/transactions?{$queryString}";
+        while ($retryCount <= $maxRetries) {
+            try {
+                $params = [
+                    'only_confirmed' => 'true',
+                    'only_to' => 'true',    // 只获取转入交易
+                    'limit' => min($limit, 200), // TronGrid API最大支持200
+                ];
 
-            $response = $this->httpClient->get($url);
-            $data = json_decode($response->getBody()->getContents(), true);
+                $queryString = http_build_query($params);
+                $url = $this->apiUrl . "/v1/accounts/{$address}/transactions?{$queryString}";
 
-            if (!isset($data['data']) || !is_array($data['data'])) {
-                Log::warning("TronGrid API返回数据格式异常", [
+                $response = $this->httpClient->get($url);
+                $data = json_decode($response->getBody()->getContents(), true);
+
+                if (!isset($data['data']) || !is_array($data['data'])) {
+                    Log::warning("TronGrid API返回数据格式异常", [
+                        'address' => $address,
+                        'response' => $data
+                    ]);
+                    return [];
+                }
+
+                // 解析并过滤交易
+                $transactions = $this->parseTransactions($data['data'], $minBlockHeight);
+
+                Log::debug("TronWebHelper::getTransactionHistory - 成功获取交易", [
                     'address' => $address,
-                    'response' => $data
+                    'min_block_height' => $minBlockHeight,
+                    'total_fetched' => count($data['data']),
+                    'filtered_count' => count($transactions),
+                ]);
+
+                return $transactions;
+
+            } catch (\GuzzleHttp\Exception\ClientException $e) {
+                $statusCode = $e->getResponse()->getStatusCode();
+                $lastException = $e;
+
+                // 处理429速率限制错误
+                if ($statusCode === 429) {
+                    $retryCount++;
+                    if ($retryCount <= $maxRetries) {
+                        // 等待时间递增：2秒、4秒、6秒
+                        $waitSeconds = $retryCount * 2;
+                        Log::warning("TronGrid API速率限制，等待 {$waitSeconds} 秒后重试 ({$retryCount}/{$maxRetries})", [
+                            'address' => $address,
+                        ]);
+                        sleep($waitSeconds);
+                        continue;
+                    }
+                }
+
+                // 其他客户端错误不重试
+                Log::error("获取TRON交易历史失败 (HTTP {$statusCode}): " . $e->getMessage(), [
+                    'address' => $address,
+                    'min_block_height' => $minBlockHeight,
+                ]);
+                return [];
+
+            } catch (\Throwable $e) {
+                Log::error("获取TRON交易历史失败: " . $e->getMessage(), [
+                    'address' => $address,
+                    'min_block_height' => $minBlockHeight,
+                    'trace' => $e->getTraceAsString()
                 ]);
                 return [];
             }
-
-            // 解析并过滤交易
-            $transactions = $this->parseTransactions($data['data'], $minBlockHeight);
-
-            Log::debug("TronWebHelper::getTransactionHistory - 成功获取交易", [
-                'address' => $address,
-                'min_block_height' => $minBlockHeight,
-                'total_fetched' => count($data['data']),
-                'filtered_count' => count($transactions),
-            ]);
-
-            return $transactions;
-
-        } catch (\Throwable $e) {
-            Log::error("获取TRON交易历史失败: " . $e->getMessage(), [
-                'address' => $address,
-                'min_block_height' => $minBlockHeight,
-                'trace' => $e->getTraceAsString()
-            ]);
-            return [];
         }
+
+        // 重试次数用尽
+        Log::error("获取TRON交易历史失败: 重试次数已用尽", [
+            'address' => $address,
+            'min_block_height' => $minBlockHeight,
+            'last_error' => $lastException ? $lastException->getMessage() : 'unknown',
+        ]);
+        return [];
     }
 
     /**
