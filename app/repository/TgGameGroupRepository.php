@@ -104,4 +104,22 @@ class TgGameGroupRepository extends IRepository
 
         return $affected > 0;
     }
+
+    /**
+     * 获取群组统计信息
+     */
+    public function getGroupStatistics(int $groupId = null): array
+    {
+        $query = $this->model::query();
+
+        if ($groupId) {
+            $query->where('id', $groupId);
+        }
+
+        return [
+            'total_groups' => (clone $query)->count(),
+            'total_prize_pool' => (clone $query)->sum('prize_pool_amount'),
+            'avg_prize_pool' => (clone $query)->avg('prize_pool_amount'),
+        ];
+    }
 }

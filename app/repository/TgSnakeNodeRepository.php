@@ -240,4 +240,101 @@ class TgSnakeNodeRepository extends IRepository
             ->unique()
             ->toArray();
     }
+
+    /**
+     * 根据玩家地址获取节点
+     */
+    public function getNodesByPlayerAddress(string $playerAddress, int $groupId = null, int $limit = 50): Collection
+    {
+        $query = $this->model::query()
+            ->where('player_address', $playerAddress);
+
+        if ($groupId) {
+            $query->where('group_id', $groupId);
+        }
+
+        return $query->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * 获取每日统计
+     */
+    public function getDailyStatistics(int $groupId = null, string $date = null): array
+    {
+        $date = $date ?? date('Y-m-d');
+        $dateStart = $date . ' 00:00:00';
+        $dateEnd = $date . ' 23:59:59';
+
+        $query = $this->model::query()
+            ->whereBetween('created_at', [$dateStart, $dateEnd]);
+
+        if ($groupId) {
+            $query->where('group_id', $groupId);
+        }
+
+        return [
+            'total_nodes' => (clone $query)->count(),
+            'active_nodes' => (clone $query)->where('status', NodeConst::STATUS_ACTIVE)->count(),
+            'archived_nodes' => (clone $query)->where('status', NodeConst::STATUS_ARCHIVED)->count(),
+            'matched_nodes' => (clone $query)->whereNotNull('matched_prize_id')->count(),
+            'total_amount' => (clone $query)->sum('amount'),
+        ];
+    }
+
+    /**
+     * 获取群组统计
+     */
+    public function getGroupStatistics(int $groupId, string $dateStart = null, string $dateEnd = null): array
+    {
+        $query = $this->model::query()
+            ->where('group_id', $groupId);
+
+        if ($dateStart) {
+            $query->where('created_at', '>=', $dateStart);
+        }
+
+        if ($dateEnd) {
+            $query->where('created_at', '<=', $dateEnd);
+        }
+
+        return [
+            'total_nodes' => (clone $query)->count(),
+            'active_nodes' => (clone $query)->where('status', NodeConst::STATUS_ACTIVE)->count(),
+            'archived_nodes' => (clone $query)->where('status', NodeConst::STATUS_ARCHIVED)->count(),
+            'matched_nodes' => (clone $query)->whereNotNull('matched_prize_id')->count(),
+            'total_amount' => (clone $query)->sum('amount'),
+            'unique_players' => (clone $query)->distinct('player_address')->count('player_address'),
+        ];
+    }
+
+    /**
+     * 根据钱包地址获取玩家节点统计
+     */
+    public function getPlayerStatsByWalletAddress(int $groupId, string $walletAddress): array
+    {
+        $query = $this->model::query()
+            ->where('group_id', $groupId)
+            ->where('player_address', $walletAddress);
+
+        return [
+            'total_nodes' => (clone $query)->count(),
+            'active_nodes' => (clone $query)->where('status', NodeConst::STATUS_ACTIVE)->count(),
+            'archived_nodes' => (clone $query)->where('status', NodeConst::STATUS_ARCHIVED)->count(),
+            'total_amount' => (clone $query)->sum('amount'),
+        ];
+    }
+
+    /**
+     * 根据钱包地址获取玩家节点
+     */
+    public function getNodesByWalletAddress(int $groupId, string $walletAddress): Collection
+    {
+        return $this->model::query()
+            ->where('group_id', $groupId)
+            ->where('player_address', $walletAddress)
+            ->orderByDesc('created_at')
+            ->get();
+    }
 }

@@ -245,4 +245,27 @@ class TgTronTransactionLogRepository extends IRepository
     {
         return $this->getByTxHash($txHash);
     }
+
+    /**
+     * 根据地址获取交易
+     */
+    public function getByAddress(string $address, string $direction = null, int $limit = 50): Collection
+    {
+        $query = $this->model::query();
+
+        if ($direction === 'from') {
+            $query->where('from_address', $address);
+        } elseif ($direction === 'to') {
+            $query->where('to_address', $address);
+        } else {
+            $query->where(function ($q) use ($address) {
+                $q->where('from_address', $address)
+                  ->orWhere('to_address', $address);
+            });
+        }
+
+        return $query->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+    }
 }

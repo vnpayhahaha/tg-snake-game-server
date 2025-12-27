@@ -279,18 +279,6 @@ class TgGameGroupService extends BaseService
      */
     public function getGroupStatistics(int $groupId = null): array
     {
-        $query = Db::table('tg_game_group');
-
-        if ($groupId) {
-            $query->where('id', $groupId);
-        }
-
-        $stats = [
-            'total_groups' => (clone $query)->count(),
-            'total_prize_pool' => (clone $query)->sum('prize_pool_amount'),
-            'avg_prize_pool' => (clone $query)->avg('prize_pool_amount'),
-        ];
-
-        return $stats;
+        return $this->repository->getGroupStatistics($groupId);
     }
 }

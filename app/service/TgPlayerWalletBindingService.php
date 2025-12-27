@@ -5,6 +5,7 @@ namespace app\service;
 use app\constants\TgPlayerWalletBindingLog as BindingLogConst;
 use app\repository\TgPlayerWalletBindingRepository;
 use app\repository\TgPlayerWalletBindingLogRepository;
+use app\repository\TgSnakeNodeRepository;
 use DI\Attribute\Inject;
 use support\Db;
 use support\Log;
@@ -20,6 +21,9 @@ class TgPlayerWalletBindingService extends BaseService
 
     #[Inject]
     protected TgPlayerWalletBindingLogRepository $bindingLogRepository;
+
+    #[Inject]
+    protected TgSnakeNodeRepository $nodeRepository;
 
     /**
      * 根据Telegram用户ID获取绑定
@@ -207,15 +211,11 @@ class TgPlayerWalletBindingService extends BaseService
     {
         $binding = $this->repository->getByTgUserId($groupId, $tgUserId);
         if (!$binding) {
-            return [];
+            return collect([]);
         }
 
         // 查询该玩家的所有节点
-        return Db::table('tg_snake_node')
-            ->where('group_id', $groupId)
-            ->where('wallet_address', $binding->wallet_address)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        return $this->nodeRepository->getNodesByWalletAddress($groupId, $binding->wallet_address);
     }
 
     /**
@@ -233,36 +233,7 @@ class TgPlayerWalletBindingService extends BaseService
             ];
         }
 
-        $walletAddress = $binding->wallet_address;
-
-        $totalNodes = Db::table('tg_snake_node')
-            ->where('group_id', $groupId)
-            ->where('wallet_address', $walletAddress)
-            ->count();
-
-        $activeNodes = Db::table('tg_snake_node')
-            ->where('group_id', $groupId)
-            ->where('wallet_address', $walletAddress)
-            ->where('status', 1) // 假设1是活跃状态
-            ->count();
-
-        $archivedNodes = Db::table('tg_snake_node')
-            ->where('group_id', $groupId)
-            ->where('wallet_address', $walletAddress)
-            ->where('status', 2) // 假设2是归档状态
-            ->count();
-
-        $totalAmount = Db::table('tg_snake_node')
-            ->where('group_id', $groupId)
-            ->where('wallet_address', $walletAddress)
-            ->sum('amount');
-
-        return [
-            'total_nodes' => $totalNodes,
-            'active_nodes' => $activeNodes,
-            'archived_nodes' => $archivedNodes,
-            'total_amount' => $totalAmount,
-        ];
+        return $this->nodeRepository->getPlayerStatsByWalletAddress($groupId, $binding->wallet_address);
     }
 
     /**

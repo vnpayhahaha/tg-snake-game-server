@@ -484,21 +484,6 @@ class TgTronMonitorService extends BaseService
      */
     public function getByAddress(string $address, string $direction = null, int $limit = 50)
     {
-        $query = Db::table('tg_tron_transaction_log');
-
-        if ($direction === 'from') {
-            $query->where('from_address', $address);
-        } elseif ($direction === 'to') {
-            $query->where('to_address', $address);
-        } else {
-            $query->where(function ($q) use ($address) {
-                $q->where('from_address', $address)
-                  ->orWhere('to_address', $address);
-            });
-        }
-
-        return $query->orderBy('created_at', 'desc')
-            ->limit($limit)
-            ->get();
+        return $this->repository->getByAddress($address, $direction, $limit);
     }
 }

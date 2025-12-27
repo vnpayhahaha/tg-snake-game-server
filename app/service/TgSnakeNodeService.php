@@ -261,16 +261,7 @@ class TgSnakeNodeService extends BaseService
      */
     public function getNodesByPlayer(string $playerAddress, int $groupId = null, int $limit = 50)
     {
-        $query = Db::table('tg_snake_node')
-            ->where('player_address', $playerAddress);
-
-        if ($groupId) {
-            $query->where('group_id', $groupId);
-        }
-
-        return $query->orderBy('created_at', 'desc')
-            ->limit($limit)
-            ->get();
+        return $this->repository->getNodesByPlayerAddress($playerAddress, $groupId, $limit);
     }
 
     /**
@@ -278,29 +269,7 @@ class TgSnakeNodeService extends BaseService
      */
     public function getDailyStatistics(int $groupId = null, string $date = null): array
     {
-        if (!$date) {
-            $date = date('Y-m-d');
-        }
-
-        $dateStart = $date . ' 00:00:00';
-        $dateEnd = $date . ' 23:59:59';
-
-        $query = Db::table('tg_snake_node')
-            ->whereBetween('created_at', [$dateStart, $dateEnd]);
-
-        if ($groupId) {
-            $query->where('group_id', $groupId);
-        }
-
-        $stats = [
-            'total_nodes' => (clone $query)->count(),
-            'active_nodes' => (clone $query)->where('status', NodeConst::STATUS_ACTIVE)->count(),
-            'archived_nodes' => (clone $query)->where('status', NodeConst::STATUS_ARCHIVED)->count(),
-            'matched_nodes' => (clone $query)->whereNotNull('matched_prize_id')->count(),
-            'total_amount' => (clone $query)->sum('amount'),
-        ];
-
-        return $stats;
+        return $this->repository->getDailyStatistics($groupId, $date);
     }
 
     /**
@@ -308,27 +277,7 @@ class TgSnakeNodeService extends BaseService
      */
     public function getGroupStatistics(int $groupId, string $dateStart = null, string $dateEnd = null): array
     {
-        $query = Db::table('tg_snake_node')
-            ->where('group_id', $groupId);
-
-        if ($dateStart) {
-            $query->where('created_at', '>=', $dateStart);
-        }
-
-        if ($dateEnd) {
-            $query->where('created_at', '<=', $dateEnd);
-        }
-
-        $stats = [
-            'total_nodes' => (clone $query)->count(),
-            'active_nodes' => (clone $query)->where('status', NodeConst::STATUS_ACTIVE)->count(),
-            'archived_nodes' => (clone $query)->where('status', NodeConst::STATUS_ARCHIVED)->count(),
-            'matched_nodes' => (clone $query)->whereNotNull('matched_prize_id')->count(),
-            'total_amount' => (clone $query)->sum('amount'),
-            'unique_players' => (clone $query)->distinct('player_address')->count('player_address'),
-        ];
-
-        return $stats;
+        return $this->repository->getGroupStatistics($groupId, $dateStart, $dateEnd);
     }
 
     /**
@@ -381,13 +330,7 @@ class TgSnakeNodeService extends BaseService
     public function batchArchiveNodes(array $nodeIds): array
     {
         try {
-            Db::beginTransaction();
-
-            $updated = Db::table('tg_snake_node')
-                ->whereIn('id', $nodeIds)
-                ->update(['status' => NodeConst::STATUS_ARCHIVED]);
-
-            Db::commit();
+            $updated = $this->repository->archiveNodesByIds($nodeIds);
 
             return [
                 'success' => true,
@@ -395,7 +338,6 @@ class TgSnakeNodeService extends BaseService
                 'count' => $updated,
             ];
         } catch (\Exception $e) {
-            Db::rollBack();
             Log::error('批量归档节点失败: ' . $e->getMessage());
             return [
                 'success' => false,

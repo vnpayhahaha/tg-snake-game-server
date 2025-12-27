@@ -475,12 +475,9 @@ class TgPrizeService extends BaseService
     /**
      * 根据钱包轮换周期获取中奖记录
      */
-    public function getByWalletCycle(string $walletCycleNo)
+    public function getByWalletCycle(int $groupId, int $walletCycle)
     {
-        return Db::table('tg_prize_record')
-            ->where('wallet_cycle_no', $walletCycleNo)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        return $this->repository->getByWalletCycle($groupId, $walletCycle);
     }
 
     /**

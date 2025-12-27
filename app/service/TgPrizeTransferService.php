@@ -201,9 +201,7 @@ class TgPrizeTransferService extends BaseService
      */
     public function getByNodeId(int $nodeId)
     {
-        return Db::table('tg_prize_transfer')
-            ->where('node_id', $nodeId)
-            ->first();
+        return $this->repository->getByNodeId($nodeId)->first();
     }
 
     /**
@@ -211,9 +209,7 @@ class TgPrizeTransferService extends BaseService
      */
     public function getByTxHash(string $txHash)
     {
-        return Db::table('tg_prize_transfer')
-            ->where('tx_hash', $txHash)
-            ->first();
+        return $this->repository->getByTxHash($txHash);
     }
 
     /**
