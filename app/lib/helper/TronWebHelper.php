@@ -634,6 +634,8 @@ class TronWebHelper
 
     /**
      * 解析TRON交易数据（辅助方法）
+     * 记录所有交易类型，通过 contract_type 字段区分交易类型
+     *
      * @param array $transactions TronGrid API返回的原始交易数据
      * @param int $minBlockHeight 最小区块高度
      * @return array 标准化的交易数组
@@ -652,40 +654,31 @@ class TronWebHelper
 
             // 获取合约参数
             $contract = $tx['raw_data']['contract'][0] ?? [];
-            $contractType = $contract['type'] ?? '';
-
-            // 只处理TRX转账交易（TransferContract），跳过其他类型（如TRC20、合约调用等）
-            if ($contractType !== 'TransferContract') {
-                continue;
-            }
-
+            $contractType = $contract['type'] ?? 'Unknown';
             $parameter = $contract['parameter']['value'] ?? [];
-
-            // 确保有接收地址（to_address），跳过没有接收地址的交易
-            if (empty($parameter['to_address'])) {
-                continue;
-            }
 
             // 检查交易状态
             $status = ($tx['ret'][0]['contractRet'] ?? '') === 'SUCCESS' ? 'SUCCESS' : 'FAILED';
 
             // 转换地址格式（HEX to Base58）
             $fromAddress = $this->hexToBase58($parameter['owner_address'] ?? '');
-            $toAddress = $this->hexToBase58($parameter['to_address'] ?? '');
+            // to_address 可能不存在（如合约调用等）
+            $toAddress = !empty($parameter['to_address'])
+                ? $this->hexToBase58($parameter['to_address'])
+                : '';
 
-            // 再次验证地址转换成功
-            if (empty($toAddress)) {
-                continue;
-            }
+            // 金额：TRX转账有amount，其他类型可能没有
+            $amount = (int)($parameter['amount'] ?? 0);
 
             $result[] = [
                 'tx_hash' => $tx['txID'] ?? '',
                 'from_address' => $fromAddress,
                 'to_address' => $toAddress,
-                'amount' => (int)($parameter['amount'] ?? 0),
+                'amount' => $amount,
                 'block_height' => $blockNumber,
                 'block_timestamp' => (int)(($tx['block_timestamp'] ?? 0) / 1000), // 毫秒转秒
                 'status' => $status,
+                'contract_type' => $contractType, // 新增：交易合约类型
             ];
         }
 

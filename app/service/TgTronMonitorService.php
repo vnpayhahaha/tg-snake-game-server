@@ -77,9 +77,19 @@ class TgTronMonitorService extends BaseService
 
     /**
      * 验证交易有效性
+     * 检查交易是否符合游戏参与条件
      */
     public function validateTransaction(array $txData, $config): array
     {
+        // 0. 检查交易类型是否为TRX转账
+        $contractType = $txData['contract_type'] ?? 'Unknown';
+        if ($contractType !== 'TransferContract') {
+            return [
+                'valid' => false,
+                'reason' => "非TRX转账交易，交易类型: {$contractType}",
+            ];
+        }
+
         // 1. 检查交易金额是否为固定投注金额
         if ($txData['amount'] != $config->bet_amount) {
             return [

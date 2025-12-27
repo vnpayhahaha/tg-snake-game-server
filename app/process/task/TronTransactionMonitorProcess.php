@@ -142,18 +142,13 @@ class TronTransactionMonitorProcess
                 'wallet_address' => $config->wallet_address,
             ]);
 
-            // 处理每笔交易
-            foreach ($transactions as $tx) {
-                // 只处理转入交易（防御性检查）
-                if ($tx['to_address'] !== $config->wallet_address) {
-                    Log::warning("检测到非转入交易，跳过", [
-                        'tx_hash' => $tx['tx_hash'],
-                        'to_address' => $tx['to_address'],
-                        'expected_address' => $config->wallet_address,
-                    ]);
-                    continue;
-                }
+            // 按区块高度正序排序（从旧到新），确保写入顺序正确
+            usort($transactions, function ($a, $b) {
+                return $a['block_height'] <=> $b['block_height'];
+            });
 
+            // 处理每笔交易（所有交易都记录，通过验证逻辑判断是否有效）
+            foreach ($transactions as $tx) {
                 // 调用监控服务处理入账交易
                 $result = $this->monitorService->processIncomingTransaction($config->id, [
                     'tx_hash' => $tx['tx_hash'],
@@ -163,6 +158,7 @@ class TronTransactionMonitorProcess
                     'block_height' => $tx['block_height'],
                     'block_timestamp' => $tx['block_timestamp'],
                     'status' => $tx['status'],  // SUCCESS/FAILED
+                    'contract_type' => $tx['contract_type'] ?? 'Unknown', // 交易类型
                 ]);
 
                 if ($result['success']) {
@@ -172,19 +168,19 @@ class TronTransactionMonitorProcess
                         'amount_sun' => $tx['amount'],
                         'amount_trx' => TronWebHelper::sunToTrx($tx['amount']),
                         'block_height' => $tx['block_height'],
+                        'contract_type' => $tx['contract_type'] ?? 'Unknown',
                     ]);
                 } else {
-                    Log::warning("处理入账交易失败", [
+                    Log::info("记录交易（无效或已处理）", [
                         'group_id' => $config->id,
                         'tx_hash' => $tx['tx_hash'],
-                        'error' => $result['message'],
+                        'message' => $result['message'],
+                        'contract_type' => $tx['contract_type'] ?? 'Unknown',
                     ]);
                 }
             }
 
             // 记录监控完成
-            // 注意：区块高度会通过交易日志自动更新，无需手动更新
-            // getLatestBlockHeight() 方法会从交易表中获取最大的 block_height
             $latestBlock = max(array_column($transactions, 'block_height'));
 
             Log::info("群组交易监控完成", [
