@@ -9,6 +9,7 @@ use app\service\TgGameGroupService;
 use app\service\TgPlayerWalletBindingService;
 use app\service\TgPrizeService;
 use app\service\TgSnakeNodeService;
+use app\service\TgTronMonitorService;
 use DI\Attribute\Inject;
 use support\Log;
 
@@ -31,6 +32,12 @@ class TgBotCommandService
 
     #[Inject]
     protected TgPrizeService $prizeService;
+
+    #[Inject]
+    protected TgTronMonitorService $tronMonitorService;
+
+    #[Inject]
+    protected TronWebHelper $tronHelper;
 
     /**
      * 验证是否为群组管理员
@@ -1062,6 +1069,9 @@ class TgBotCommandService
                 'status' => 1, // 设置钱包后自动启用
             ], 2);  // change_source = 2 (Telegram Bot)
 
+            // 初始化交易基准点：获取钱包最新的交易记录并保存，避免后续监听时处理历史交易
+            $this->initializeTransactionBaseline($config->id, $walletAddress);
+
             $message = $isCn
                 ? "✅ 收款钱包地址已设置\n\n" .
                   "钱包地址：<code>{$walletAddress}</code>\n" .
@@ -1491,5 +1501,65 @@ class TgBotCommandService
                 ? '未知命令，请使用 /help 查看命令列表'
                 : 'Unknown command, use /help to see command list',
         ];
+    }
+
+    /**
+     * 初始化交易基准点
+     * 设置钱包时获取最新的交易记录并保存到数据库，作为后续监听的起点
+     * 避免处理设置钱包之前的历史交易
+     *
+     * @param int $groupId 群组配置ID
+     * @param string $walletAddress 钱包地址
+     */
+    protected function initializeTransactionBaseline(int $groupId, string $walletAddress): void
+    {
+        try {
+            // 获取钱包最新的交易记录（只取最近1条TRX转账）
+            $transactions = $this->tronHelper->getTransactionHistory($walletAddress, 0, 10);
+
+            if (empty($transactions)) {
+                Log::info("初始化交易基准点：钱包无历史交易", [
+                    'group_id' => $groupId,
+                    'wallet_address' => $walletAddress,
+                ]);
+                return;
+            }
+
+            // 取最新的一条交易作为基准点
+            $latestTx = $transactions[0];
+
+            // 记录到交易日志表（标记为已处理，不触发游戏逻辑）
+            // processed = 1 表示已处理，避免被补偿机制重新处理
+            // is_valid = 0 表示无效交易（基准点不参与游戏）
+            $this->tronMonitorService->logTransaction([
+                'group_id' => $groupId,
+                'tx_hash' => $latestTx['tx_hash'],
+                'from_address' => $latestTx['from_address'],
+                'to_address' => $latestTx['to_address'],
+                'amount' => $latestTx['amount'],
+                'transaction_type' => 1, // 入账
+                'block_height' => $latestTx['block_height'],
+                'block_timestamp' => $latestTx['block_timestamp'],
+                'status' => $latestTx['status'],
+                'is_valid' => 0,  // 基准点交易标记为无效，不参与游戏
+                'invalid_reason' => '初始化基准点交易，不参与游戏',
+                'processed' => 1, // 标记为已处理，避免被补偿机制重新处理
+            ]);
+
+            Log::info("初始化交易基准点成功", [
+                'group_id' => $groupId,
+                'wallet_address' => $walletAddress,
+                'baseline_tx_hash' => $latestTx['tx_hash'],
+                'baseline_block_height' => $latestTx['block_height'],
+            ]);
+
+        } catch (\Throwable $e) {
+            // 初始化失败不影响主流程，只记录日志
+            Log::warning("初始化交易基准点失败: " . $e->getMessage(), [
+                'group_id' => $groupId,
+                'wallet_address' => $walletAddress,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

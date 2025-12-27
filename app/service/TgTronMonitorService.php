@@ -38,6 +38,18 @@ class TgTronMonitorService extends BaseService
 
     /**
      * 记录交易日志
+     * @param array $data 交易数据
+     *   - group_id: 群组ID
+     *   - tx_hash: 交易哈希
+     *   - from_address: 发送地址
+     *   - to_address: 接收地址
+     *   - amount: 金额
+     *   - transaction_type: 交易类型
+     *   - block_height: 区块高度（可选）
+     *   - block_timestamp: 区块时间戳（可选）
+     *   - status: 交易状态（可选）
+     *   - is_valid: 是否有效（可选，默认有效）
+     *   - processed: 是否已处理（可选，默认未处理）
      */
     public function logTransaction(array $data)
     {
@@ -57,9 +69,9 @@ class TgTronMonitorService extends BaseService
             'block_height' => $data['block_height'] ?? 0,
             'block_timestamp' => $data['block_timestamp'] ?? time(),
             'status' => $data['status'] ?? TxLogConst::TX_STATUS_SUCCESS,
-            'is_valid' => TxLogConst::VALID_YES,
-            'invalid_reason' => null,
-            'processed' => TxLogConst::PROCESSED_NO,
+            'is_valid' => $data['is_valid'] ?? TxLogConst::VALID_YES,
+            'invalid_reason' => $data['invalid_reason'] ?? null,
+            'processed' => $data['processed'] ?? TxLogConst::PROCESSED_NO,
         ]);
     }
 

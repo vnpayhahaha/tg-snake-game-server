@@ -650,16 +650,33 @@ class TronWebHelper
                 continue;
             }
 
-            // 检查交易状态
-            $status = ($tx['ret'][0]['contractRet'] ?? '') === 'SUCCESS' ? 'SUCCESS' : 'FAILED';
-
             // 获取合约参数
             $contract = $tx['raw_data']['contract'][0] ?? [];
+            $contractType = $contract['type'] ?? '';
+
+            // 只处理TRX转账交易（TransferContract），跳过其他类型（如TRC20、合约调用等）
+            if ($contractType !== 'TransferContract') {
+                continue;
+            }
+
             $parameter = $contract['parameter']['value'] ?? [];
+
+            // 确保有接收地址（to_address），跳过没有接收地址的交易
+            if (empty($parameter['to_address'])) {
+                continue;
+            }
+
+            // 检查交易状态
+            $status = ($tx['ret'][0]['contractRet'] ?? '') === 'SUCCESS' ? 'SUCCESS' : 'FAILED';
 
             // 转换地址格式（HEX to Base58）
             $fromAddress = $this->hexToBase58($parameter['owner_address'] ?? '');
             $toAddress = $this->hexToBase58($parameter['to_address'] ?? '');
+
+            // 再次验证地址转换成功
+            if (empty($toAddress)) {
+                continue;
+            }
 
             $result[] = [
                 'tx_hash' => $tx['txID'] ?? '',
