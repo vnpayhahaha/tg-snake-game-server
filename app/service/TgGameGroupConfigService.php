@@ -42,8 +42,8 @@ class TgGameGroupConfigService extends BaseService
             // 创建配置
             $config = $this->repository->create($data);
 
-            // 记录创建日志
-            $this->logConfigChange($config, $data, $data['change_source'] ?? 1);
+            // 记录创建日志 - 传入 null 表示创建操作，第二个参数传入完整的新配置数据
+            $this->logConfigChange(null, $config->toArray(), $data['change_source'] ?? 1);
 
             // 自动创建对应的游戏群组
             $this->gameGroupRepository->create([
@@ -321,23 +321,24 @@ class TgGameGroupConfigService extends BaseService
 
     /**
      * 记录配置变更日志
+     * @param mixed $oldConfig 旧配置对象，创建场景传入 null
+     * @param array $newData 创建场景传入完整配置数据，更新场景传入变更的字段
+     * @param int $changeSource 变更来源：1=后台编辑，2=TG群指令
      */
     protected function logConfigChange($oldConfig, array $newData, int $changeSource = 1): void
     {
         try {
-            // 如果是创建操作（oldConfig为空或没有id），特殊处理
-            $isCreate = !$oldConfig || !isset($oldConfig->id);
+            // 如果是创建操作（oldConfig为null），特殊处理
+            $isCreate = $oldConfig === null;
 
             if ($isCreate) {
-                // 创建场景：oldConfig就是新创建的配置对象
-                $configData = is_array($oldConfig) ? $oldConfig : (is_object($oldConfig) ? $oldConfig->toArray() : []);
-
+                // 创建场景：$newData 是新创建的完整配置数据
                 $this->configLogRepository->logConfigChange([
-                    'config_id' => $configData['id'] ?? null,
-                    'tg_chat_id' => $configData['tg_chat_id'] ?? null,
-                    'change_params' => json_encode($newData),
+                    'config_id' => $newData['id'] ?? null,
+                    'tg_chat_id' => $newData['tg_chat_id'] ?? null,
+                    'change_params' => json_encode($newData, JSON_UNESCAPED_UNICODE),
                     'old_config' => null,  // 创建时没有旧配置
-                    'new_config' => json_encode($configData),
+                    'new_config' => json_encode($newData, JSON_UNESCAPED_UNICODE),
                     'operator' => $this->getCurrentUserName() ?: 'system',
                     'operator_ip' => $this->getOperatorIp(),
                     'change_source' => $changeSource,
@@ -348,9 +349,9 @@ class TgGameGroupConfigService extends BaseService
                 $this->configLogRepository->logConfigChange([
                     'config_id' => $oldConfig->id,
                     'tg_chat_id' => $oldConfig->tg_chat_id,
-                    'change_params' => json_encode($newData),
-                    'old_config' => json_encode($oldConfig->toArray()),
-                    'new_config' => json_encode(array_merge($oldConfig->toArray(), $newData)),
+                    'change_params' => json_encode($newData, JSON_UNESCAPED_UNICODE),
+                    'old_config' => json_encode($oldConfig->toArray(), JSON_UNESCAPED_UNICODE),
+                    'new_config' => json_encode(array_merge($oldConfig->toArray(), $newData), JSON_UNESCAPED_UNICODE),
                     'operator' => $this->getCurrentUserName() ?: 'system',
                     'operator_ip' => $this->getOperatorIp(),
                     'change_source' => $changeSource,
@@ -359,7 +360,7 @@ class TgGameGroupConfigService extends BaseService
             }
         } catch (\Throwable $e) {
             Log::warning("记录配置变更日志失败: " . $e->getMessage(), [
-                'config_id' => $oldConfig->id ?? null,
+                'config_id' => $oldConfig->id ?? ($newData['id'] ?? null),
                 'error' => $e->getMessage(),
             ]);
         }
