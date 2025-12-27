@@ -278,11 +278,17 @@ class TgBotCommandService
             ];
         }
 
-        $snake = $this->groupService->getCurrentSnake($group->id);
-        $snakeCount = count($snake);
+        // 获取活跃节点（按创建时间倒序，最新的在前面）
+        $activeNodes = $this->nodeService->getActiveNodes($group->id);
+        $snakeCount = $activeNodes->count();
 
         // 获取蛇头票号（最新的节点）
-        $snakeHeadTicket = !empty($snake) ? $snake[0]['ticket'] : '暂无';
+        $snakeHeadTicket = $isCn ? '暂无' : 'None';
+        if ($snakeCount > 0) {
+            /** @var \app\model\ModelTgSnakeNode $firstNode */
+            $firstNode = $activeNodes->first();
+            $snakeHeadTicket = $firstNode->ticket_number;
+        }
 
         $text = $isCn
             ? "🐍 当前蛇身状态\n\n" .
@@ -294,9 +300,13 @@ class TgBotCommandService
               "Snake Head Ticket: {$snakeHeadTicket}\n\n" .
               "Recent Nodes (max 10):\n";
 
-        $recentNodes = array_slice($snake, 0, 10);
+        $recentNodes = $activeNodes->take(10);
         foreach ($recentNodes as $index => $node) {
-            $text .= ($index + 1) . ". " . $node['ticket'] . " ({$node['amount']} TRX)\n";
+            $text .= ($index + 1) . ". " . $node->ticket_number . " ({$node->amount} TRX)\n";
+        }
+
+        if ($snakeCount == 0) {
+            $text .= $isCn ? "暂无节点\n" : "No nodes yet\n";
         }
 
         return ['success' => true, 'message' => $text];
