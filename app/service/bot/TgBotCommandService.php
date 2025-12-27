@@ -1221,7 +1221,23 @@ class TgBotCommandService
             if (!empty($messageData['reply_to_message'])) {
                 $targetUserId = $messageData['reply_to_message']['from']['id'] ?? null;
             }
-            // 方式2：通过用户ID参数
+            // 方式2：通过用户名参数（@username）
+            elseif (!empty($params[0]) && str_starts_with($params[0], '@')) {
+                $username = ltrim($params[0], '@');
+                // 从绑定记录中查找用户ID
+                $binding = $this->bindingService->getByUsername($config->id, $username);
+                if ($binding) {
+                    $targetUserId = $binding->tg_user_id;
+                } else {
+                    return [
+                        'success' => false,
+                        'message' => $isCn
+                            ? "❌ 未找到用户 @{$username}\n该用户可能未在本群绑定钱包\n\n💡 请使用以下方式：\n1. 回复该用户消息后执行 /添加管理\n2. 直接使用用户ID：/添加管理 用户ID"
+                            : "❌ User @{$username} not found\nThis user may not have bound wallet in this group\n\n💡 Please use:\n1. Reply to user message and execute /add_admin\n2. Use user ID directly: /add_admin USER_ID",
+                    ];
+                }
+            }
+            // 方式3：通过用户ID参数（数字）
             elseif (!empty($params[0])) {
                 $targetUserId = intval($params[0]);
             }
@@ -1230,8 +1246,8 @@ class TgBotCommandService
                 return [
                     'success' => false,
                     'message' => $isCn
-                        ? "❌ 请提供用户ID或回复用户消息\n用法1：/添加管理 用户ID\n用法2：回复用户消息后执行 /添加管理"
-                        : "❌ Please provide user ID or reply to user message\nUsage 1: /add_admin USER_ID\nUsage 2: Reply to user message and execute /add_admin",
+                        ? "❌ 请提供用户ID、@用户名或回复用户消息\n用法1：/添加管理 用户ID\n用法2：/添加管理 @用户名\n用法3：回复用户消息后执行 /添加管理"
+                        : "❌ Please provide user ID, @username or reply to user message\nUsage 1: /add_admin USER_ID\nUsage 2: /add_admin @username\nUsage 3: Reply to user message and execute /add_admin",
                 ];
             }
 
@@ -1310,7 +1326,23 @@ class TgBotCommandService
             if (!empty($messageData['reply_to_message'])) {
                 $targetUserId = $messageData['reply_to_message']['from']['id'] ?? null;
             }
-            // 方式2：通过用户ID参数
+            // 方式2：通过用户名参数（@username）
+            elseif (!empty($params[0]) && str_starts_with($params[0], '@')) {
+                $username = ltrim($params[0], '@');
+                // 从绑定记录中查找用户ID
+                $binding = $this->bindingService->getByUsername($config->id, $username);
+                if ($binding) {
+                    $targetUserId = $binding->tg_user_id;
+                } else {
+                    return [
+                        'success' => false,
+                        'message' => $isCn
+                            ? "❌ 未找到用户 @{$username}\n该用户可能未在本群绑定钱包\n\n💡 请使用以下方式：\n1. 回复该用户消息后执行 /移除管理\n2. 直接使用用户ID：/移除管理 用户ID"
+                            : "❌ User @{$username} not found\nThis user may not have bound wallet in this group\n\n💡 Please use:\n1. Reply to user message and execute /remove_admin\n2. Use user ID directly: /remove_admin USER_ID",
+                    ];
+                }
+            }
+            // 方式3：通过用户ID参数（数字）
             elseif (!empty($params[0])) {
                 $targetUserId = intval($params[0]);
             }
@@ -1319,8 +1351,8 @@ class TgBotCommandService
                 return [
                     'success' => false,
                     'message' => $isCn
-                        ? "❌ 请提供用户ID或回复用户消息\n用法1：/移除管理 用户ID\n用法2：回复用户消息后执行 /移除管理"
-                        : "❌ Please provide user ID or reply to user message\nUsage 1: /remove_admin USER_ID\nUsage 2: Reply to user message and execute /remove_admin",
+                        ? "❌ 请提供用户ID、@用户名或回复用户消息\n用法1：/移除管理 用户ID\n用法2：/移除管理 @用户名\n用法3：回复用户消息后执行 /移除管理"
+                        : "❌ Please provide user ID, @username or reply to user message\nUsage 1: /remove_admin USER_ID\nUsage 2: /remove_admin @username\nUsage 3: Reply to user message and execute /remove_admin",
                 ];
             }
 
