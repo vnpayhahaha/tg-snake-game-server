@@ -1295,7 +1295,8 @@ class TgBotCommandService
     }
 
     /**
-     * 从白名单移除管理员命令（管理员专用）
+     * 从白名单移除管理员命令（仅超级管理员可用）
+     * 超级管理员：白名单中的第一个用户
      */
     protected function handleRemoveAdmin(int $chatId, int $userId, array $params, array $messageData, bool $isCn): array
     {
@@ -1316,6 +1317,17 @@ class TgBotCommandService
                     'message' => $isCn
                         ? "❌ 群组未配置"
                         : "❌ Group not configured",
+                ];
+            }
+
+            // 验证是否为超级管理员（白名单中的第一个用户）
+            $whitelist = $config->getAdminWhitelistArray();
+            if (empty($whitelist) || $whitelist[0] != $userId) {
+                return [
+                    'success' => false,
+                    'message' => $isCn
+                        ? "❌ 只有超级管理员（首位管理员）可以移除其他管理员"
+                        : "❌ Only the super admin (first admin) can remove other administrators",
                 ];
             }
 
