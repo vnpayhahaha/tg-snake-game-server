@@ -169,6 +169,19 @@ class TgSnakeNodeService extends BaseService
     }
 
     /**
+     * 获取玩家在当前蛇身中的活跃节点（通过Telegram用户ID）
+     */
+    public function getPlayerActiveNodes(int $groupId, int $tgUserId)
+    {
+        return Db::table('tg_snake_node')
+            ->where('group_id', $groupId)
+            ->where('player_tg_user_id', $tgUserId)
+            ->where('status', NodeConst::STATUS_ACTIVE)
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
      * 根据凭证流水号查询
      */
     public function findByTicketSerialNo(string $serialNo)

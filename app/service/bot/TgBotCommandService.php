@@ -459,8 +459,8 @@ class TgBotCommandService
 
         $ticketList = $nodes->map(function ($node) use ($isCn) {
             return $isCn
-                ? "票号：{$node->ticket_number} | 投注：{$node->bet_amount} TRX | 位置：#{$node->position}"
-                : "Ticket: {$node->ticket_number} | Bet: {$node->bet_amount} TRX | Position: #{$node->position}";
+                ? "票号：{$node->ticket_number} | 投注：{$node->amount} TRX | 流水号：{$node->ticket_serial_no}"
+                : "Ticket: {$node->ticket_number} | Bet: {$node->amount} TRX | Serial: {$node->ticket_serial_no}";
         })->join("\n");
 
         $text = $isCn
