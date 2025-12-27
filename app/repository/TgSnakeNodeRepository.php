@@ -213,4 +213,31 @@ class TgSnakeNodeRepository extends IRepository
             'total_amount' => $totalAmount,
         ];
     }
+
+    /**
+     * 获取玩家在当前蛇身中的活跃节点（通过Telegram用户ID）
+     */
+    public function getPlayerActiveNodesByTgUserId(int $groupId, int $tgUserId): Collection
+    {
+        return $this->model::query()
+            ->where('group_id', $groupId)
+            ->where('player_tg_user_id', $tgUserId)
+            ->where('status', NodeConst::STATUS_ACTIVE)
+            ->orderByDesc('created_at')
+            ->get();
+    }
+
+    /**
+     * 获取玩家已中奖的节点对应的中奖记录ID（通过Telegram用户ID）
+     */
+    public function getPlayerMatchedPrizeIds(int $groupId, int $tgUserId): array
+    {
+        return $this->model::query()
+            ->where('group_id', $groupId)
+            ->where('player_tg_user_id', $tgUserId)
+            ->whereNotNull('matched_prize_id')
+            ->pluck('matched_prize_id')
+            ->unique()
+            ->toArray();
+    }
 }

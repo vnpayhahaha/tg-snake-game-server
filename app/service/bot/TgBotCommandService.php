@@ -506,13 +506,9 @@ class TgBotCommandService
         }
 
         $winList = $winRecords->map(function ($record) use ($isCn) {
-            $typeText = $isCn
-                ? ($record->prize_type == 1 ? 'Jackpot' : '范围匹配')
-                : ($record->prize_type == 1 ? 'Jackpot' : 'Range Match');
-
             return $isCn
-                ? "🏆 {$typeText} | 票号：{$record->winning_ticket} | 奖金：{$record->prize_amount} TRX | {$record->created_at}"
-                : "🏆 {$typeText} | Ticket: {$record->winning_ticket} | Prize: {$record->prize_amount} TRX | {$record->created_at}";
+                ? "🏆 票号：{$record->ticket_number} | 奖金：{$record->prize_amount} TRX | {$record->created_at}"
+                : "🏆 Ticket: {$record->ticket_number} | Prize: {$record->prize_amount} TRX | {$record->created_at}";
         })->join("\n\n");
 
         $totalPrize = $winRecords->sum('prize_amount');

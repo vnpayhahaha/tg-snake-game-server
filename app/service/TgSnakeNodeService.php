@@ -173,12 +173,7 @@ class TgSnakeNodeService extends BaseService
      */
     public function getPlayerActiveNodes(int $groupId, int $tgUserId)
     {
-        return Db::table('tg_snake_node')
-            ->where('group_id', $groupId)
-            ->where('player_tg_user_id', $tgUserId)
-            ->where('status', NodeConst::STATUS_ACTIVE)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        return $this->repository->getPlayerActiveNodesByTgUserId($groupId, $tgUserId);
     }
 
     /**

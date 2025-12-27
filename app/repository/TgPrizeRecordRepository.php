@@ -205,4 +205,32 @@ class TgPrizeRecordRepository extends IRepository
             ->orderByDesc('created_at')
             ->get();
     }
+
+    /**
+     * 根据ID列表获取中奖记录
+     */
+    public function getByIds(array $ids, int $limit = 10): Collection
+    {
+        if (empty($ids)) {
+            return collect([]);
+        }
+
+        return $this->model::query()
+            ->whereIn('id', $ids)
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * 获取群组最近中奖记录
+     */
+    public function getGroupRecentWins(int $groupId, int $limit = 5): Collection
+    {
+        return $this->model::query()
+            ->where('group_id', $groupId)
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+    }
 }

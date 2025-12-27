@@ -589,4 +589,27 @@ class TgPrizeService extends BaseService
     {
         return $this->repository->updateById($id, ['status' => $status]);
     }
+
+    /**
+     * 获取玩家的中奖记录（通过Telegram用户ID）
+     */
+    public function getPlayerWinRecords(int $groupId, int $tgUserId, int $limit = 10)
+    {
+        // 先获取该用户的所有已中奖节点对应的中奖记录ID
+        $prizeIds = $this->nodeRepository->getPlayerMatchedPrizeIds($groupId, $tgUserId);
+
+        if (empty($prizeIds)) {
+            return collect([]);
+        }
+
+        return $this->repository->getByIds($prizeIds, $limit);
+    }
+
+    /**
+     * 获取群组最近中奖记录
+     */
+    public function getGroupRecentWins(int $groupId, int $limit = 5)
+    {
+        return $this->repository->getGroupRecentWins($groupId, $limit);
+    }
 }
