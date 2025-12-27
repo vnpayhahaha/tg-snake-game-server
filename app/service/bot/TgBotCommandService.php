@@ -590,22 +590,18 @@ class TgBotCommandService
         }
 
         $winList = $recentWins->map(function ($record) use ($isCn) {
-            $typeText = $isCn
-                ? ($record->prize_type == 1 ? 'Jackpot' : '范围匹配')
-                : ($record->prize_type == 1 ? 'Jackpot' : 'Range Match');
-
-            $username = $record->winner_username ?: 'User#' . $record->winner_tg_user_id;
-
             return $isCn
-                ? "🏆 {$typeText}\n" .
-                  "   中奖用户：@{$username}\n" .
-                  "   票号：{$record->winning_ticket}\n" .
-                  "   奖金：{$record->prize_amount} TRX\n" .
+                ? "🏆 中奖记录\n" .
+                  "   流水号：{$record->prize_serial_no}\n" .
+                  "   票号：{$record->ticket_number}\n" .
+                  "   中奖人数：{$record->winner_count} 人\n" .
+                  "   总奖金：{$record->prize_amount} TRX\n" .
                   "   时间：{$record->created_at}"
-                : "🏆 {$typeText}\n" .
-                  "   Winner: @{$username}\n" .
-                  "   Ticket: {$record->winning_ticket}\n" .
-                  "   Prize: {$record->prize_amount} TRX\n" .
+                : "🏆 Win Record\n" .
+                  "   Serial: {$record->prize_serial_no}\n" .
+                  "   Ticket: {$record->ticket_number}\n" .
+                  "   Winners: {$record->winner_count}\n" .
+                  "   Total Prize: {$record->prize_amount} TRX\n" .
                   "   Time: {$record->created_at}";
         })->join("\n\n");
 
@@ -637,32 +633,45 @@ class TgBotCommandService
             ];
         }
 
-        // 获取群组统计数据
-        $stats = $this->groupService->getGroupStatistics($group->id);
+        // 获取活跃节点统计
+        $activeNodes = $this->nodeService->getActiveNodes($group->id);
+        $snakeLength = $activeNodes->count();
+
+        // 获取蛇头票号
+        $snakeHeadTicket = $isCn ? '暂无' : 'None';
+        if ($snakeLength > 0) {
+            /** @var \app\model\ModelTgSnakeNode $firstNode */
+            $firstNode = $activeNodes->first();
+            $snakeHeadTicket = $firstNode->ticket_number;
+        }
+
+        // 获取节点统计数据
+        $nodeStats = $this->nodeService->getGroupStatistics($group->id);
+
+        // 获取中奖统计数据
+        $prizeStats = $this->prizeService->getGroupStatistics($group->id);
 
         $text = $isCn
             ? "📊 群组统计\n\n" .
-              "当前蛇身长度：{$stats['snake_length']}\n" .
-              "当前蛇头：{$stats['snake_head_ticket']}\n" .
-              "总奖池：{$group->prize_pool} TRX\n" .
-              "钱包周期：#{$group->current_wallet_cycle}\n\n" .
-              "参与玩家数：{$stats['total_players']}\n" .
-              "总投注金额：{$stats['total_bet_amount']} TRX\n" .
-              "总交易次数：{$stats['total_transactions']}\n\n" .
-              "Jackpot中奖次数：{$stats['jackpot_wins']}\n" .
-              "范围匹配次数：{$stats['range_wins']}\n" .
-              "总派奖金额：{$stats['total_prize_amount']} TRX"
+              "当前蛇身长度：{$snakeLength}\n" .
+              "当前蛇头：{$snakeHeadTicket}\n" .
+              "总奖池：{$group->prize_pool_amount} TRX\n" .
+              "钱包周期：#{$config->wallet_change_count}\n\n" .
+              "参与玩家数：{$nodeStats['unique_players']}\n" .
+              "总投注金额：{$nodeStats['total_amount']} TRX\n" .
+              "总交易次数：{$nodeStats['total_nodes']}\n\n" .
+              "总中奖次数：{$prizeStats['total_count']}\n" .
+              "总派奖金额：{$prizeStats['total_prize_amount']} TRX"
             : "📊 Group Statistics\n\n" .
-              "Current Snake Length: {$stats['snake_length']}\n" .
-              "Snake Head: {$stats['snake_head_ticket']}\n" .
-              "Prize Pool: {$group->prize_pool} TRX\n" .
-              "Wallet Cycle: #{$group->current_wallet_cycle}\n\n" .
-              "Total Players: {$stats['total_players']}\n" .
-              "Total Bet Amount: {$stats['total_bet_amount']} TRX\n" .
-              "Total Transactions: {$stats['total_transactions']}\n\n" .
-              "Jackpot Wins: {$stats['jackpot_wins']}\n" .
-              "Range Wins: {$stats['range_wins']}\n" .
-              "Total Prizes: {$stats['total_prize_amount']} TRX";
+              "Current Snake Length: {$snakeLength}\n" .
+              "Snake Head: {$snakeHeadTicket}\n" .
+              "Prize Pool: {$group->prize_pool_amount} TRX\n" .
+              "Wallet Cycle: #{$config->wallet_change_count}\n\n" .
+              "Total Players: {$nodeStats['unique_players']}\n" .
+              "Total Bet Amount: {$nodeStats['total_amount']} TRX\n" .
+              "Total Transactions: {$nodeStats['total_nodes']}\n\n" .
+              "Total Wins: {$prizeStats['total_count']}\n" .
+              "Total Prizes: {$prizeStats['total_prize_amount']} TRX";
 
         return ['success' => true, 'message' => $text];
     }
