@@ -169,6 +169,7 @@ class TelegramService
                 'chat_id' => $this->telegramBot->ChatID(),
                 'from_user_id' => $this->telegramBot->UserId(),
                 'from_username' => $this->telegramBot->UserName(),
+                'reply_to_message' => $this->telegramBot->getReplyToMessage(),
             ];
 
             // 调用统一的handleCommand方法
