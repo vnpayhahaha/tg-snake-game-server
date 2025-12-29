@@ -94,7 +94,7 @@ class TgBotCommandService
                 'GetId', 'cnGetId' => $this->handleGetId($userId, $command === 'cnGetId'),
                 'GetGroupId', 'cnGetGroupId' => $this->handleGetGroupId($chatId, $command === 'cnGetGroupId'),
                 // 管理员初始化指令
-                'BindTenant', 'cnBindTenant' => $this->handleBindTenant($chatId, $userId, $params, $command === 'cnBindTenant'),
+                'BindTenant', 'cnBindTenant' => $this->handleBindTenant($chatId, $userId, $params, $messageData, $command === 'cnBindTenant'),
                 'SetWallet', 'cnSetWallet' => $this->handleSetWallet($chatId, $userId, $params, $command === 'cnSetWallet'),
                 'SetBetAmount', 'cnSetBetAmount' => $this->handleSetBetAmount($chatId, $userId, $params, $command === 'cnSetBetAmount'),
                 // 管理员白名单管理
@@ -867,7 +867,7 @@ class TgBotCommandService
      * 绑定租户ID命令
      * 注意：首次绑定时无需管理员权限，谁先绑定谁就是管理员
      */
-    protected function handleBindTenant(int $chatId, int $userId, array $params, bool $isCn): array
+    protected function handleBindTenant(int $chatId, int $userId, array $params, array $messageData, bool $isCn): array
     {
         // 验证参数
         if (empty($params[0])) {
@@ -946,10 +946,12 @@ class TgBotCommandService
                       ($config->wallet_address ? "✅ Group configured, game is ready" : "⚠️ Please set wallet: /set_wallet TRON_ADDRESS");
             } else {
                 // 创建新配置，并将执行绑定的用户设为首位管理员
+                // 从messageData中获取群组名称，如果获取不到则使用默认值
+                $chatTitle = $messageData['chat_title'] ?? 'Unknown';
                 $newConfig = $this->configService->create([
                     'tenant_id' => $tenantId,
                     'tg_chat_id' => $chatId,
-                    'tg_chat_title' => 'Unknown', // 会在webhook中更新为实际群组名称
+                    'tg_chat_title' => $chatTitle ?: 'Unknown', // 使用实际群组名称
                     'wallet_address' => '',
                     'bet_amount' => 5.0, // 默认5 TRX
                     'platform_fee_rate' => 0.10, // 默认10%

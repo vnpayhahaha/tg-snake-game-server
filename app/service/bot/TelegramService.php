@@ -167,6 +167,7 @@ class TelegramService
             // 构建消息数据
             $messageData = [
                 'chat_id' => $this->telegramBot->ChatID(),
+                'chat_title' => $this->telegramBot->getGroupTitle(), // 群组名称
                 'from_user_id' => $this->telegramBot->UserId(),
                 'from_username' => $this->telegramBot->UserName(),
                 'reply_to_message' => $this->telegramBot->getReplyToMessage(),
