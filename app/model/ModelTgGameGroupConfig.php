@@ -3,6 +3,7 @@
 namespace app\model;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
 * @property int $id 主键 主键
@@ -132,5 +133,14 @@ final class ModelTgGameGroupConfig extends BasicModel
     public function isInAdminWhitelist(int $userId): bool
     {
         return in_array($userId, $this->getAdminWhitelistArray(), true);
+    }
+
+    /**
+     * 关联游戏群组（一对一）
+     * @return HasOne
+     */
+    public function group(): HasOne
+    {
+        return $this->hasOne(ModelTgGameGroup::class, 'config_id', 'id');
     }
 }

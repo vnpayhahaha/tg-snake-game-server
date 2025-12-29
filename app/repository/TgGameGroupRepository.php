@@ -55,7 +55,10 @@ class TgGameGroupRepository extends IRepository
     {
         return (bool)$this->model::query()
             ->whereKey($id)
-            ->update(['prize_pool_amount' => $amount]);
+            ->update([
+                'prize_pool_amount'   => $amount,
+                'current_snake_nodes' => ''
+            ]);
     }
 
     /**
@@ -82,11 +85,11 @@ class TgGameGroupRepository extends IRepository
         return (bool)$this->model::query()
             ->whereKey($id)
             ->update([
-                'last_prize_nodes' => $prizeData['nodes'] ?? '',
-                'last_prize_amount' => $prizeData['amount'] ?? 0,
-                'last_prize_address' => $prizeData['address'] ?? '',
+                'last_prize_nodes'     => $prizeData['nodes'] ?? '',
+                'last_prize_amount'    => $prizeData['amount'] ?? 0,
+                'last_prize_address'   => $prizeData['address'] ?? '',
                 'last_prize_serial_no' => $prizeData['serial_no'] ?? '',
-                'last_prize_at' => $prizeData['prize_at'] ?? now(),
+                'last_prize_at'        => $prizeData['prize_at'] ?? now(),
             ]);
     }
 
@@ -117,9 +120,19 @@ class TgGameGroupRepository extends IRepository
         }
 
         return [
-            'total_groups' => (clone $query)->count(),
+            'total_groups'     => (clone $query)->count(),
             'total_prize_pool' => (clone $query)->sum('prize_pool_amount'),
-            'avg_prize_pool' => (clone $query)->avg('prize_pool_amount'),
+            'avg_prize_pool'   => (clone $query)->avg('prize_pool_amount'),
         ];
+    }
+
+    public function page(array $params = [], ?int $page = null, ?int $pageSize = null): array
+    {
+        $result = $this->perQuery($this->getQuery(), $params)->with('config:id,tenant_id,tg_chat_title,status')->paginate(
+            perPage: $pageSize,
+            pageName: static::PER_PAGE_PARAM_NAME,
+            page: $page,
+        );
+        return $this->handlePage($result);
     }
 }

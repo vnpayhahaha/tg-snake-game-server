@@ -3,6 +3,7 @@
 namespace app\model;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
 * @property int $id 主键 主键
@@ -33,7 +34,7 @@ final class ModelTgGameGroup extends BasicModel
      * @var string
      */
     protected $primaryKey = 'id';
-    
+
     /**
      * The attributes that are mass assignable.
      * @var array
@@ -53,4 +54,13 @@ final class ModelTgGameGroup extends BasicModel
         'created_at',
         'updated_at'
     ];
+
+    /**
+     * 关联群组配置（一对一）
+     * @return BelongsTo
+     */
+    public function config(): BelongsTo
+    {
+        return $this->belongsTo(ModelTgGameGroupConfig::class, 'config_id', 'id');
+    }
 }
