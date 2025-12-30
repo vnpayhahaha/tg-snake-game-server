@@ -676,37 +676,69 @@ class TgBotCommandService
             : "🎊 Recent Winners\n\n";
 
         foreach ($recentWins as $record) {
-            // 根据首尾节点ID查询区间内的所有中奖节点
+            // 根据首尾节点ID查询中奖节点
             $firstNodeId = $record->winner_node_id_first;
             $lastNodeId = $record->winner_node_id_last;
 
-            // 获取区间内所有节点（包含首尾）
-            $winnerNodes = $this->nodeService->getNodesBetween($firstNodeId, $lastNodeId);
+            // 获取首尾中奖节点详情
+            $firstNode = $this->nodeService->findById($firstNodeId);
+            $lastNode = $this->nodeService->findById($lastNodeId);
+
+            // 计算中奖间隔（首尾之间的期数差）
+            $prizeInterval = $lastNodeId - $firstNodeId;
+
+            // 判断中奖人数（首尾是否同一人）
+            $isSamePerson = $firstNode && $lastNode && $firstNode->player_address === $lastNode->player_address;
+            $actualWinnerCount = $isSamePerson ? 1 : 2;
 
             if ($isCn) {
                 $text .= "🏆 中奖流水号：{$record->prize_serial_no}\n";
                 $text .= "   🎫 中奖票号：{$record->ticket_number}\n";
-                $text .= "   👥 中奖人数：{$record->winner_count} 人\n";
+                $text .= "   📏 中奖间隔：{$prizeInterval} 期\n";
+                $text .= "   👥 中奖人数：{$actualWinnerCount} 人\n";
+                // 展示首尾中奖地址
+                if ($firstNode) {
+                    $text .= "   💳 首中奖地址：{$firstNode->player_address}\n";
+                }
+                if ($lastNode && $firstNodeId != $lastNodeId) {
+                    $text .= "   💳 尾中奖地址：{$lastNode->player_address}\n";
+                }
                 $text .= "   💰 总奖金：{$record->prize_amount} TRX\n";
                 $text .= "   🕐 时间：{$record->created_at}\n";
                 $text .= "📋 中奖节点列表（第 {$page}/{$totalPages} 页）：\n";
-                foreach ($winnerNodes as $index => $node) {
-                    $walletSuffix = '...' . substr($node->player_address, -8);
-                    $num = $index + 1;
-                    $text .= "   {$num}. {$node->ticket_serial_no} | 🎫{$node->ticket_number} | 💳{$walletSuffix}\n";
+                // 只显示首尾两个中奖节点
+                if ($firstNode) {
+                    $walletSuffix = '...' . substr($firstNode->player_address, -8);
+                    $text .= "   1. {$firstNode->ticket_serial_no} | 🎫{$firstNode->ticket_number} | 💳{$walletSuffix}\n";
+                }
+                if ($lastNode && $firstNodeId != $lastNodeId) {
+                    $walletSuffix = '...' . substr($lastNode->player_address, -8);
+                    $text .= "   2. {$lastNode->ticket_serial_no} | 🎫{$lastNode->ticket_number} | 💳{$walletSuffix}\n";
                 }
                 $text .= "\n";
             } else {
                 $text .= "🏆 Prize Serial: {$record->prize_serial_no}\n";
                 $text .= "   🎫 Ticket: {$record->ticket_number}\n";
-                $text .= "   👥 Winners: {$record->winner_count}\n";
+                $text .= "   📏 Interval: {$prizeInterval} rounds\n";
+                $text .= "   👥 Winners: {$actualWinnerCount}\n";
+                // 展示首尾中奖地址
+                if ($firstNode) {
+                    $text .= "   💳 First Winner: {$firstNode->player_address}\n";
+                }
+                if ($lastNode && $firstNodeId != $lastNodeId) {
+                    $text .= "   💳 Last Winner: {$lastNode->player_address}\n";
+                }
                 $text .= "   💰 Prize: {$record->prize_amount} TRX\n";
                 $text .= "   🕐 Time: {$record->created_at}\n";
                 $text .= "📋 Winner Nodes (Page {$page}/{$totalPages}):\n";
-                foreach ($winnerNodes as $index => $node) {
-                    $walletSuffix = '...' . substr($node->player_address, -8);
-                    $num = $index + 1;
-                    $text .= "   {$num}. {$node->ticket_serial_no} | 🎫{$node->ticket_number} | 💳{$walletSuffix}\n";
+                // 只显示首尾两个中奖节点
+                if ($firstNode) {
+                    $walletSuffix = '...' . substr($firstNode->player_address, -8);
+                    $text .= "   1. {$firstNode->ticket_serial_no} | 🎫{$firstNode->ticket_number} | 💳{$walletSuffix}\n";
+                }
+                if ($lastNode && $firstNodeId != $lastNodeId) {
+                    $walletSuffix = '...' . substr($lastNode->player_address, -8);
+                    $text .= "   2. {$lastNode->ticket_serial_no} | 🎫{$lastNode->ticket_number} | 💳{$walletSuffix}\n";
                 }
                 $text .= "\n";
             }
