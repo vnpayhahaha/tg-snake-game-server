@@ -67,7 +67,7 @@ class TelegramService
         $callbackData = $this->telegramBot->Callback_Data();
         $callbackQueryId = $this->telegramBot->Callback_ID();
         $chatId = $this->telegramBot->Callback_ChatID();
-        $messageId = $this->telegramBot->Callback_Message_ID();
+        $messageId = $this->telegramBot->MessageID(); // MessageID() 在 CALLBACK_QUERY 时自动返回回调消息ID
 
         var_dump('======handleCallbackQuery===', $callbackData, $callbackQueryId, $chatId, $messageId);
 
@@ -103,13 +103,18 @@ class TelegramService
      */
     protected function handleSnakePageCallback(int $chatId, int $messageId, string $callbackQueryId, int $page, bool $isCn): bool
     {
+        var_dump('======handleSnakePageCallback start===', $chatId, $messageId, $page, $isCn);
+
         // 调用commandService获取指定页的蛇身数据
         $result = $this->commandService->handleSnakeCallback($chatId, $isCn, $page);
+
+        var_dump('======handleSnakeCallback result===', $result);
 
         // 应答回调查询（移除加载状态）
         $this->telegramBot->answerCallbackQuery(['callback_query_id' => $callbackQueryId]);
 
         if (!$result['success']) {
+            var_dump('======handleSnakePageCallback failed===', $result['message'] ?? 'unknown error');
             return false;
         }
 
@@ -126,8 +131,14 @@ class TelegramService
             $editData['reply_markup'] = json_encode(['inline_keyboard' => $result['inline_keyboard']]);
         }
 
+        var_dump('======editMessageText data===', $editData);
+
         // 编辑原消息
-        return $this->telegramBot->editMessageText($editData);
+        $editResult = $this->telegramBot->editMessageText($editData);
+
+        var_dump('======editMessageText result===', $editResult);
+
+        return (bool)$editResult;
     }
 
 
