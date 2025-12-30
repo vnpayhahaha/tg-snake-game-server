@@ -536,12 +536,12 @@ class TronWebHelper
     /**
      * 获取钱包地址的交易历史
      * @param string $address 钱包地址
-     * @param int $minBlockHeight 最小区块高度（从此高度开始查询）
+     * @param int $minTimestamp 最小时间戳（秒），从此时间之后的交易
      * @param int $limit 返回记录数限制
      * @param int $maxRetries 最大重试次数（用于处理429速率限制）
      * @return array 交易列表
      */
-    public function getTransactionHistory(string $address, int $minBlockHeight = 0, int $limit = 200, int $maxRetries = 3): array
+    public function getTransactionHistory(string $address, int $minTimestamp = 0, int $limit = 200, int $maxRetries = 3): array
     {
         // 验证地址格式
         if (!self::isValidAddress($address)) {
@@ -562,6 +562,12 @@ class TronWebHelper
                     'limit' => min($limit, 200), // TronGrid API最大支持200
                 ];
 
+                // 使用 min_timestamp 过滤（毫秒）
+                if ($minTimestamp > 0) {
+                    // 加1秒避免重复获取边界交易
+                    $params['min_timestamp'] = ($minTimestamp + 1) * 1000;
+                }
+
                 $queryString = http_build_query($params);
                 $url = $this->apiUrl . "/v1/accounts/{$address}/transactions?{$queryString}";
 
@@ -576,12 +582,12 @@ class TronWebHelper
                     return [];
                 }
 
-                // 解析并过滤交易
-                $transactions = $this->parseTransactions($data['data'], $minBlockHeight);
+                // 解析交易（不再需要按区块高度过滤，API已通过时间戳过滤）
+                $transactions = $this->parseTransactions($data['data'], 0);
 
                 Log::debug("TronWebHelper::getTransactionHistory - 成功获取交易", [
                     'address' => $address,
-                    'min_block_height' => $minBlockHeight,
+                    'min_timestamp' => $minTimestamp,
                     'total_fetched' => count($data['data']),
                     'filtered_count' => count($transactions),
                 ]);

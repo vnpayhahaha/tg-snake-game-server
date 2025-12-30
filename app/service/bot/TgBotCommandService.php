@@ -266,8 +266,12 @@ class TgBotCommandService
 
     /**
      * 蛇身命令
+     * @param int $chatId 群组ID
+     * @param bool $isCn 是否中文
+     * @param int $page 页码（从1开始）
+     * @return array
      */
-    protected function handleSnake(int $chatId, bool $isCn): array
+    protected function handleSnake(int $chatId, bool $isCn, int $page = 1): array
     {
         $config = $this->configService->getByTgChatId($chatId);
         if (!$config) {
@@ -285,38 +289,96 @@ class TgBotCommandService
             ];
         }
 
+        $perPage = 10; // 每页显示10条
+        $page = max(1, $page); // 确保页码至少为1
+
         // 获取活跃节点（按创建时间倒序，最新的在前面）
         $activeNodes = $this->nodeService->getActiveNodes($group->id);
         $snakeCount = $activeNodes->count();
+        $totalPages = max(1, ceil($snakeCount / $perPage));
+        $page = min($page, $totalPages); // 确保页码不超过总页数
 
         // 获取蛇头票号（最新的节点）
         $snakeHeadTicket = $isCn ? '暂无' : 'None';
+        $snakeHeadSerialNo = '';
         if ($snakeCount > 0) {
             /** @var \app\model\ModelTgSnakeNode $firstNode */
             $firstNode = $activeNodes->first();
             $snakeHeadTicket = $firstNode->ticket_number;
+            $snakeHeadSerialNo = $firstNode->ticket_serial_no;
         }
 
         $text = $isCn
             ? "🐍 当前蛇身状态\n\n" .
               "蛇身长度：{$snakeCount} 节\n" .
-              "蛇头票号：{$snakeHeadTicket}\n\n" .
-              "最近节点（最多显示10个）：\n"
+              "蛇头票号：{$snakeHeadTicket}" . ($snakeHeadSerialNo ? " ({$snakeHeadSerialNo})" : "") . "\n\n" .
+              "节点列表（第 {$page}/{$totalPages} 页）：\n"
             : "🐍 Current Snake Status\n\n" .
               "Snake Length: {$snakeCount} nodes\n" .
-              "Snake Head Ticket: {$snakeHeadTicket}\n\n" .
-              "Recent Nodes (max 10):\n";
+              "Snake Head: {$snakeHeadTicket}" . ($snakeHeadSerialNo ? " ({$snakeHeadSerialNo})" : "") . "\n\n" .
+              "Node List (Page {$page}/{$totalPages}):\n";
 
-        $recentNodes = $activeNodes->take(10);
-        foreach ($recentNodes as $index => $node) {
-            $text .= ($index + 1) . ". " . $node->ticket_number . " ({$node->amount} TRX)\n";
+        // 分页获取节点
+        $offset = ($page - 1) * $perPage;
+        $pageNodes = $activeNodes->slice($offset, $perPage);
+
+        foreach ($pageNodes as $node) {
+            // 显示流水号、票号和钱包地址后8位
+            $walletSuffix = substr($node->player_address, -8);
+            $text .= "{$node->ticket_serial_no} | 🎫{$node->ticket_number} | 💳...{$walletSuffix}\n";
         }
 
         if ($snakeCount == 0) {
             $text .= $isCn ? "暂无节点\n" : "No nodes yet\n";
         }
 
-        return ['success' => true, 'message' => $text];
+        // 构建分页按钮
+        $inlineKeyboard = null;
+        if ($totalPages > 1) {
+            $buttons = [];
+
+            // 上一页按钮
+            if ($page > 1) {
+                $buttons[] = [
+                    'text' => $isCn ? '⬅️ 上一页' : '⬅️ Prev',
+                    'callback_data' => "snake_page:" . ($page - 1) . ":" . ($isCn ? '1' : '0'),
+                ];
+            }
+
+            // 页码显示
+            $buttons[] = [
+                'text' => "{$page}/{$totalPages}",
+                'callback_data' => "snake_page:{$page}:" . ($isCn ? '1' : '0'),
+            ];
+
+            // 下一页按钮
+            if ($page < $totalPages) {
+                $buttons[] = [
+                    'text' => $isCn ? '下一页 ➡️' : 'Next ➡️',
+                    'callback_data' => "snake_page:" . ($page + 1) . ":" . ($isCn ? '1' : '0'),
+                ];
+            }
+
+            $inlineKeyboard = [$buttons];
+        }
+
+        return [
+            'success' => true,
+            'message' => $text,
+            'inline_keyboard' => $inlineKeyboard,
+        ];
+    }
+
+    /**
+     * 蛇身分页回调处理（供TelegramService调用）
+     * @param int $chatId 群组ID
+     * @param bool $isCn 是否中文
+     * @param int $page 页码
+     * @return array
+     */
+    public function handleSnakeCallback(int $chatId, bool $isCn, int $page): array
+    {
+        return $this->handleSnake($chatId, $isCn, $page);
     }
 
     /**

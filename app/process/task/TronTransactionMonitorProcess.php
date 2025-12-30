@@ -118,21 +118,21 @@ class TronTransactionMonitorProcess
      */
     protected function monitorGroupTransactions($config): void
     {
-        // 获取上次检查的区块高度
-        $lastBlockHeight = $this->monitorService->getLatestBlockHeight($config->id) ?? 0;
+        // 获取上次检查的区块时间戳（秒）
+        $lastTimestamp = $this->monitorService->getLatestBlockTimestamp($config->id) ?? 0;
 
         try {
-            // 使用TronWebHelper获取钱包地址的交易历史
+            // 使用TronWebHelper获取钱包地址的交易历史（使用时间戳过滤）
             $transactions = $this->tronHelper->getTransactionHistory(
                 $config->wallet_address,
-                $lastBlockHeight
+                $lastTimestamp
             );
 
             // 如果没有新交易，直接返回
             if (empty($transactions)) {
                 Log::debug("群组 {$config->id} 没有新交易", [
                     'wallet_address' => $config->wallet_address,
-                    'last_block_height' => $lastBlockHeight,
+                    'last_timestamp' => $lastTimestamp,
                 ]);
                 return;
             }
@@ -142,9 +142,9 @@ class TronTransactionMonitorProcess
                 'wallet_address' => $config->wallet_address,
             ]);
 
-            // 按区块高度正序排序（从旧到新），确保写入顺序正确
+            // 按区块时间戳正序排序（从旧到新），确保写入顺序正确
             usort($transactions, function ($a, $b) {
-                return $a['block_height'] <=> $b['block_height'];
+                return $a['block_timestamp'] <=> $b['block_timestamp'];
             });
 
             // 处理每笔交易（所有交易都记录，通过验证逻辑判断是否有效）
@@ -167,7 +167,7 @@ class TronTransactionMonitorProcess
                         'tx_hash' => $tx['tx_hash'],
                         'amount_sun' => $tx['amount'],
                         'amount_trx' => TronWebHelper::sunToTrx($tx['amount']),
-                        'block_height' => $tx['block_height'],
+                        'block_timestamp' => $tx['block_timestamp'],
                         'contract_type' => $tx['contract_type'] ?? 'Unknown',
                     ]);
                 } else {
@@ -181,20 +181,20 @@ class TronTransactionMonitorProcess
             }
 
             // 记录监控完成
-            $latestBlock = max(array_column($transactions, 'block_height'));
+            $latestTimestamp = max(array_column($transactions, 'block_timestamp'));
 
             Log::info("群组交易监控完成", [
                 'group_id' => $config->id,
                 'processed_count' => count($transactions),
-                'last_block_height' => $lastBlockHeight,
-                'latest_block' => $latestBlock,
+                'last_timestamp' => $lastTimestamp,
+                'latest_timestamp' => $latestTimestamp,
             ]);
 
         } catch (\Throwable $e) {
             Log::error("监控群组交易异常: " . $e->getMessage(), [
                 'group_id' => $config->id,
                 'wallet_address' => $config->wallet_address,
-                'last_block_height' => $lastBlockHeight,
+                'last_timestamp' => $lastTimestamp,
                 'trace' => $e->getTraceAsString()
             ]);
         }

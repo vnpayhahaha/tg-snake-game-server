@@ -39,6 +39,13 @@ class TelegramService
         //把信息进行分类，分开是私人聊天还是群内聊天
         $is_group = $this->telegramBot->messageFromGroup();
         var_dump('======webHook $is_group===', $is_group);
+
+        // 处理callback_query（InlineKeyboard按钮点击）
+        $type = $this->telegramBot->getUpdateType();
+        if ($type === TelegramBot::CALLBACK_QUERY) {
+            return $this->handleCallbackQuery();
+        }
+
         if ($is_group) {
             $chat_id = (int)$this->telegramBot->ChatID();
             try {
@@ -50,6 +57,77 @@ class TelegramService
             $this->privateWork();
         }
         return true;
+    }
+
+    /**
+     * 处理InlineKeyboard按钮点击回调
+     */
+    protected function handleCallbackQuery(): bool
+    {
+        $callbackData = $this->telegramBot->Callback_Data();
+        $callbackQueryId = $this->telegramBot->Callback_ID();
+        $chatId = $this->telegramBot->Callback_ChatID();
+        $messageId = $this->telegramBot->Callback_Message_ID();
+
+        var_dump('======handleCallbackQuery===', $callbackData, $callbackQueryId, $chatId, $messageId);
+
+        // 解析回调数据
+        $parts = explode(':', $callbackData);
+        $action = $parts[0] ?? '';
+
+        try {
+            switch ($action) {
+                case 'snake_page':
+                    // 蛇身分页: snake_page:页码:是否中文(1/0)
+                    $page = (int)($parts[1] ?? 1);
+                    $isCn = ($parts[2] ?? '1') === '1';
+                    return $this->handleSnakePageCallback($chatId, $messageId, $callbackQueryId, $page, $isCn);
+                default:
+                    // 未知回调，应答但不做任何操作
+                    $this->telegramBot->answerCallbackQuery(['callback_query_id' => $callbackQueryId]);
+                    return true;
+            }
+        } catch (\Throwable $e) {
+            var_dump('handleCallbackQuery error:', $e->getMessage());
+            $this->telegramBot->answerCallbackQuery([
+                'callback_query_id' => $callbackQueryId,
+                'text' => 'Error: ' . $e->getMessage(),
+                'show_alert' => true,
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * 处理蛇身分页回调
+     */
+    protected function handleSnakePageCallback(int $chatId, int $messageId, string $callbackQueryId, int $page, bool $isCn): bool
+    {
+        // 调用commandService获取指定页的蛇身数据
+        $result = $this->commandService->handleSnakeCallback($chatId, $isCn, $page);
+
+        // 应答回调查询（移除加载状态）
+        $this->telegramBot->answerCallbackQuery(['callback_query_id' => $callbackQueryId]);
+
+        if (!$result['success']) {
+            return false;
+        }
+
+        // 构建编辑消息的数据
+        $editData = [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'text' => $result['message'],
+            'parse_mode' => 'HTML',
+        ];
+
+        // 添加InlineKeyboard
+        if (!empty($result['inline_keyboard'])) {
+            $editData['reply_markup'] = json_encode(['inline_keyboard' => $result['inline_keyboard']]);
+        }
+
+        // 编辑原消息
+        return $this->telegramBot->editMessageText($editData);
     }
 
 
@@ -176,13 +254,14 @@ class TelegramService
             // 调用统一的handleCommand方法
             $result = $this->commandService->handleCommand($data['method'], $data['params'], $messageData);
 
-            // 提取消息内容
+            // 提取消息内容和InlineKeyboard
             $message = $result['message'] ?? $result;
+            $inlineKeyboard = $result['inline_keyboard'] ?? null;
         } catch (\Throwable $e) {
             var_dump('------throwable==commandGroupRun--', $e->getMessage());
             return $this->returnException($this->telegramBot->ChatID(), $e, $record->id);
         }
-        return $this->sendMessageProducer($this->telegramBot->ChatID(), $message, $this->telegramBot->MessageID());
+        return $this->sendMessageProducer($this->telegramBot->ChatID(), $message, $this->telegramBot->MessageID(), $inlineKeyboard);
     }
 
     public function privateWork(): void
@@ -250,12 +329,13 @@ class TelegramService
      * @param int $chat_id
      * @param mixed $content
      * @param int $reply_markup
+     * @param array|null $inlineKeyboard InlineKeyboard按钮数组
      * @return bool
      * @throws JsonException
      */
-    public function sendMessageProducer(int $chat_id, mixed $content, int $reply_markup = 0): bool
+    public function sendMessageProducer(int $chat_id, mixed $content, int $reply_markup = 0, ?array $inlineKeyboard = null): bool
     {
-        if (is_array($content)) {
+        if (is_array($content) && !isset($content['inline_keyboard'])) {
             $content = self::formatTxt($content);
         } else if (is_string($content)) {
             $content = trim($content);
@@ -265,7 +345,7 @@ class TelegramService
             $content = json_encode($content, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
         } else if (is_bool($content)) {
             $content = $content ? 'successful' : 'failed';
-        } else {
+        } else if (!is_array($content)) {
             return false;
         }
         $data = array(
@@ -275,6 +355,10 @@ class TelegramService
         );
         if ($reply_markup > 0) {
             $data['reply_to_message_id'] = $reply_markup;
+        }
+        // 添加InlineKeyboard支持
+        if ($inlineKeyboard) {
+            $data['reply_markup'] = json_encode(['inline_keyboard' => $inlineKeyboard], JSON_THROW_ON_ERROR);
         }
         return Redis::send(CommandEnum::TELEGRAM_NOTICE_QUEUE_NAME, $data);
     }

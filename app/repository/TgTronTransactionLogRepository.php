@@ -178,6 +178,16 @@ class TgTronTransactionLogRepository extends IRepository
     }
 
     /**
+     * 获取最新的区块时间戳（秒）
+     */
+    public function getLatestBlockTimestamp(int $groupId): ?int
+    {
+        return $this->model::query()
+            ->where('group_id', $groupId)
+            ->max('block_timestamp');
+    }
+
+    /**
      * 统计交易数据
      */
     public function getTransactionStatistics(int $groupId, string $dateStart = null, string $dateEnd = null): array

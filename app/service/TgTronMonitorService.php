@@ -296,6 +296,14 @@ class TgTronMonitorService extends BaseService
     }
 
     /**
+     * 获取最新的区块时间戳（秒）
+     */
+    public function getLatestBlockTimestamp(int $groupId): ?int
+    {
+        return $this->repository->getLatestBlockTimestamp($groupId);
+    }
+
+    /**
      * 记录出账交易（派奖转账）
      */
     public function logOutgoingTransaction(int $groupId, array $txData)
