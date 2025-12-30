@@ -34,6 +34,9 @@ class TgSnakeNodeRepository extends IRepository
         if (isset($params['player_address']) && filled($params['player_address'])) {
             $query->where('player_address', $params['player_address']);
         }
+        if (isset($params['wallet_address']) && filled($params['wallet_address'])) {
+            $query->where('wallet_address', $params['wallet_address']);
+        }
 
         if (isset($params['ticket_serial_no']) && filled($params['ticket_serial_no'])) {
             $query->where('ticket_serial_no', $params['ticket_serial_no']);

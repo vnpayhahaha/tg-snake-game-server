@@ -10,6 +10,7 @@ use Carbon\Carbon;
 * @property int $wallet_cycle 钱包周期（对应wallet_change_count）
 * @property string $ticket_number 购彩凭证(00-99)
 * @property string $ticket_serial_no 凭证流水号(格式: YYYYMMDD-序号，如: 20250108-001)
+* @property string $wallet_address 收款地址
 * @property string $player_address 玩家钱包地址
 * @property string $player_tg_username Telegram用户名
 * @property int $player_tg_user_id Telegram用户ID
@@ -44,6 +45,7 @@ final class ModelTgSnakeNode extends BasicModel
         'wallet_cycle',
         'ticket_number',
         'ticket_serial_no',
+        'wallet_address',
         'player_address',
         'player_tg_username',
         'player_tg_user_id',

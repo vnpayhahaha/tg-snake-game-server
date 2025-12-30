@@ -50,6 +50,7 @@ return [
     'channel_callback_record'   => app\constants\ChannelCallbackRecord::class,
     // TG游戏相关常量
     'tg_game_group_config'      => app\constants\TgGameGroupConfig::class,
+    'tg_game_group_config_log'      => app\constants\TgGameGroupConfigLog::class,
     // TG游戏群组配置
     'tg_snake_node'             => app\constants\TgSnakeNode::class,
     // TG贪吃蛇节点
