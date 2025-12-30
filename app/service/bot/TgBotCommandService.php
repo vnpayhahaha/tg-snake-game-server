@@ -672,48 +672,43 @@ class TgBotCommandService
         $recentWins = $this->prizeService->getGroupRecentWinsPaginated($group->id, $perPage, $offset);
 
         $text = $isCn
-            ? "🎊 最近中奖记录（第 {$page}/{$totalPages} 页）\n\n"
-            : "🎊 Recent Winners (Page {$page}/{$totalPages})\n\n";
+            ? "🎊 最近中奖记录\n\n"
+            : "🎊 Recent Winners\n\n";
 
         foreach ($recentWins as $record) {
-            // 获取中奖节点信息
-            $winnerNodeIds = explode(',', $record->winner_node_ids);
+            // 根据首尾节点ID查询区间内的所有中奖节点
             $firstNodeId = $record->winner_node_id_first;
             $lastNodeId = $record->winner_node_id_last;
 
-            // 获取首尾节点详情
-            $firstNode = $this->nodeService->findById($firstNodeId);
-            $lastNode = $this->nodeService->findById($lastNodeId);
-
-            $firstWalletSuffix = $firstNode ? '...' . substr($firstNode->player_address, -8) : '未知';
-            $lastWalletSuffix = $lastNode ? '...' . substr($lastNode->player_address, -8) : '未知';
-
-            // 提取票号流水号，避免在字符串插值中使用复杂表达式
-            $firstTicketSerialCn = $firstNode->ticket_serial_no ?? '未知';
-            $lastTicketSerialCn = $lastNode->ticket_serial_no ?? '未知';
-            $firstTicketSerialEn = $firstNode->ticket_serial_no ?? 'N/A';
-            $lastTicketSerialEn = $lastNode->ticket_serial_no ?? 'N/A';
+            // 获取区间内所有节点（包含首尾）
+            $winnerNodes = $this->nodeService->getNodesBetween($firstNodeId, $lastNodeId);
 
             if ($isCn) {
                 $text .= "🏆 中奖流水号：{$record->prize_serial_no}\n";
                 $text .= "   🎫 中奖票号：{$record->ticket_number}\n";
                 $text .= "   👥 中奖人数：{$record->winner_count} 人\n";
                 $text .= "   💰 总奖金：{$record->prize_amount} TRX\n";
-                $text .= "   📍 首节点：{$firstTicketSerialCn} | 💳{$firstWalletSuffix}\n";
-                if ($firstNodeId != $lastNodeId) {
-                    $text .= "   📍 尾节点：{$lastTicketSerialCn} | 💳{$lastWalletSuffix}\n";
+                $text .= "   🕐 时间：{$record->created_at}\n";
+                $text .= "📋 中奖节点列表（第 {$page}/{$totalPages} 页）：\n";
+                foreach ($winnerNodes as $index => $node) {
+                    $walletSuffix = '...' . substr($node->player_address, -8);
+                    $num = $index + 1;
+                    $text .= "   {$num}. {$node->ticket_serial_no} | 🎫{$node->ticket_number} | 💳{$walletSuffix}\n";
                 }
-                $text .= "   🕐 时间：{$record->created_at}\n\n";
+                $text .= "\n";
             } else {
                 $text .= "🏆 Prize Serial: {$record->prize_serial_no}\n";
                 $text .= "   🎫 Ticket: {$record->ticket_number}\n";
                 $text .= "   👥 Winners: {$record->winner_count}\n";
                 $text .= "   💰 Prize: {$record->prize_amount} TRX\n";
-                $text .= "   📍 First: {$firstTicketSerialEn} | 💳{$firstWalletSuffix}\n";
-                if ($firstNodeId != $lastNodeId) {
-                    $text .= "   📍 Last: {$lastTicketSerialEn} | 💳{$lastWalletSuffix}\n";
+                $text .= "   🕐 Time: {$record->created_at}\n";
+                $text .= "📋 Winner Nodes (Page {$page}/{$totalPages}):\n";
+                foreach ($winnerNodes as $index => $node) {
+                    $walletSuffix = '...' . substr($node->player_address, -8);
+                    $num = $index + 1;
+                    $text .= "   {$num}. {$node->ticket_serial_no} | 🎫{$node->ticket_number} | 💳{$walletSuffix}\n";
                 }
-                $text .= "   🕐 Time: {$record->created_at}\n\n";
+                $text .= "\n";
             }
         }
 
