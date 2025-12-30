@@ -629,8 +629,12 @@ class TgBotCommandService
 
     /**
      * 最近中奖命令
+     * @param int $chatId 群组ID
+     * @param bool $isCn 是否中文
+     * @param int $page 页码（从1开始）
+     * @return array
      */
-    protected function handleRecentWins(int $chatId, bool $isCn): array
+    protected function handleRecentWins(int $chatId, bool $isCn, int $page = 1): array
     {
         $config = $this->configService->getByTgChatId($chatId);
         if (!$config) {
@@ -648,37 +652,118 @@ class TgBotCommandService
             ];
         }
 
-        // 获取最近的中奖记录（最近5条）
-        $recentWins = $this->prizeService->getGroupRecentWins($group->id, 5);
+        $perPage = 10; // 每页显示10条
+        $page = max(1, $page);
 
-        if ($recentWins->isEmpty()) {
+        // 获取中奖记录总数
+        $totalCount = $this->prizeService->getGroupPrizeCount($group->id);
+        $totalPages = max(1, ceil($totalCount / $perPage));
+        $page = min($page, $totalPages);
+
+        if ($totalCount == 0) {
             return [
                 'success' => true,
                 'message' => $isCn ? '暂无中奖记录' : 'No winning records yet',
             ];
         }
 
-        $winList = $recentWins->map(function ($record) use ($isCn) {
-            return $isCn
-                ? "🏆 中奖记录\n" .
-                  "   流水号：{$record->prize_serial_no}\n" .
-                  "   票号：{$record->ticket_number}\n" .
-                  "   中奖人数：{$record->winner_count} 人\n" .
-                  "   总奖金：{$record->prize_amount} TRX\n" .
-                  "   时间：{$record->created_at}"
-                : "🏆 Win Record\n" .
-                  "   Serial: {$record->prize_serial_no}\n" .
-                  "   Ticket: {$record->ticket_number}\n" .
-                  "   Winners: {$record->winner_count}\n" .
-                  "   Total Prize: {$record->prize_amount} TRX\n" .
-                  "   Time: {$record->created_at}";
-        })->join("\n\n");
+        // 获取分页的中奖记录
+        $offset = ($page - 1) * $perPage;
+        $recentWins = $this->prizeService->getGroupRecentWinsPaginated($group->id, $perPage, $offset);
 
         $text = $isCn
-            ? "🎊 最近中奖记录\n\n{$winList}"
-            : "🎊 Recent Winners\n\n{$winList}";
+            ? "🎊 最近中奖记录（第 {$page}/{$totalPages} 页）\n\n"
+            : "🎊 Recent Winners (Page {$page}/{$totalPages})\n\n";
 
-        return ['success' => true, 'message' => $text];
+        foreach ($recentWins as $record) {
+            // 获取中奖节点信息
+            $winnerNodeIds = explode(',', $record->winner_node_ids);
+            $firstNodeId = $record->winner_node_id_first;
+            $lastNodeId = $record->winner_node_id_last;
+
+            // 获取首尾节点详情
+            $firstNode = $this->nodeService->findById($firstNodeId);
+            $lastNode = $this->nodeService->findById($lastNodeId);
+
+            $firstWalletSuffix = $firstNode ? '...' . substr($firstNode->player_address, -8) : '未知';
+            $lastWalletSuffix = $lastNode ? '...' . substr($lastNode->player_address, -8) : '未知';
+
+            // 提取票号流水号，避免在字符串插值中使用复杂表达式
+            $firstTicketSerialCn = $firstNode->ticket_serial_no ?? '未知';
+            $lastTicketSerialCn = $lastNode->ticket_serial_no ?? '未知';
+            $firstTicketSerialEn = $firstNode->ticket_serial_no ?? 'N/A';
+            $lastTicketSerialEn = $lastNode->ticket_serial_no ?? 'N/A';
+
+            if ($isCn) {
+                $text .= "🏆 中奖流水号：{$record->prize_serial_no}\n";
+                $text .= "   🎫 中奖票号：{$record->ticket_number}\n";
+                $text .= "   👥 中奖人数：{$record->winner_count} 人\n";
+                $text .= "   💰 总奖金：{$record->prize_amount} TRX\n";
+                $text .= "   📍 首节点：{$firstTicketSerialCn} | 💳{$firstWalletSuffix}\n";
+                if ($firstNodeId != $lastNodeId) {
+                    $text .= "   📍 尾节点：{$lastTicketSerialCn} | 💳{$lastWalletSuffix}\n";
+                }
+                $text .= "   🕐 时间：{$record->created_at}\n\n";
+            } else {
+                $text .= "🏆 Prize Serial: {$record->prize_serial_no}\n";
+                $text .= "   🎫 Ticket: {$record->ticket_number}\n";
+                $text .= "   👥 Winners: {$record->winner_count}\n";
+                $text .= "   💰 Prize: {$record->prize_amount} TRX\n";
+                $text .= "   📍 First: {$firstTicketSerialEn} | 💳{$firstWalletSuffix}\n";
+                if ($firstNodeId != $lastNodeId) {
+                    $text .= "   📍 Last: {$lastTicketSerialEn} | 💳{$lastWalletSuffix}\n";
+                }
+                $text .= "   🕐 Time: {$record->created_at}\n\n";
+            }
+        }
+
+        // 构建分页按钮
+        $inlineKeyboard = null;
+        if ($totalPages > 1) {
+            $buttons = [];
+
+            // 上一页按钮
+            if ($page > 1) {
+                $buttons[] = [
+                    'text' => $isCn ? '⬅️ 上一页' : '⬅️ Prev',
+                    'callback_data' => "wins_page:" . ($page - 1) . ":" . ($isCn ? '1' : '0'),
+                ];
+            }
+
+            // 页码显示
+            $buttons[] = [
+                'text' => "{$page}/{$totalPages}",
+                'callback_data' => "wins_page:{$page}:" . ($isCn ? '1' : '0'),
+            ];
+
+            // 下一页按钮
+            if ($page < $totalPages) {
+                $buttons[] = [
+                    'text' => $isCn ? '下一页 ➡️' : 'Next ➡️',
+                    'callback_data' => "wins_page:" . ($page + 1) . ":" . ($isCn ? '1' : '0'),
+                ];
+            }
+
+            $inlineKeyboard = [$buttons];
+        }
+
+        return [
+            'success' => true,
+            'message' => $text,
+            'inline_keyboard' => $inlineKeyboard,
+        ];
+    }
+
+    /**
+     * 最近中奖分页回调处理（供TelegramService调用）
+     * @param int $chatId 群组ID
+     * @param bool $isCn 是否中文
+     * @param int $page 页码
+     * @return array
+     */
+    public function handleRecentWinsCallback(int $chatId, bool $isCn, int $page): array
+    {
+        return $this->handleRecentWins($chatId, $isCn, $page);
     }
 
     /**

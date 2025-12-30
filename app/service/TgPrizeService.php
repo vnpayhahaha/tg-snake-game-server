@@ -624,4 +624,20 @@ class TgPrizeService extends BaseService
     {
         return $this->repository->getGroupRecentWins($groupId, $limit);
     }
+
+    /**
+     * 获取群组中奖记录总数
+     */
+    public function getGroupPrizeCount(int $groupId): int
+    {
+        return $this->repository->getGroupPrizeCount($groupId);
+    }
+
+    /**
+     * 获取群组中奖记录（分页）
+     */
+    public function getGroupRecentWinsPaginated(int $groupId, int $limit = 10, int $offset = 0)
+    {
+        return $this->repository->getGroupRecentWinsPaginated($groupId, $limit, $offset);
+    }
 }

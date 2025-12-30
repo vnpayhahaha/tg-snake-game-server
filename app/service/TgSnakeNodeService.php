@@ -226,6 +226,14 @@ class TgSnakeNodeService extends BaseService
     }
 
     /**
+     * 根据ID查询节点
+     */
+    public function findById(mixed $id): mixed
+    {
+        return $this->repository->findById($id);
+    }
+
+    /**
      * 获取群组的活跃节点（控制器使用）
      */
     public function getActiveNodesByGroup(int $groupId, int $limit = 100)

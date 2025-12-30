@@ -82,6 +82,11 @@ class TelegramService
                     $page = (int)($parts[1] ?? 1);
                     $isCn = ($parts[2] ?? '1') === '1';
                     return $this->handleSnakePageCallback($chatId, $messageId, $callbackQueryId, $page, $isCn);
+                case 'wins_page':
+                    // 最近中奖分页: wins_page:页码:是否中文(1/0)
+                    $page = (int)($parts[1] ?? 1);
+                    $isCn = ($parts[2] ?? '1') === '1';
+                    return $this->handleWinsPageCallback($chatId, $messageId, $callbackQueryId, $page, $isCn);
                 default:
                     // 未知回调，应答但不做任何操作
                     $this->telegramBot->answerCallbackQuery(['callback_query_id' => $callbackQueryId]);
@@ -115,6 +120,49 @@ class TelegramService
 
         if (!$result['success']) {
             var_dump('======handleSnakePageCallback failed===', $result['message'] ?? 'unknown error');
+            return false;
+        }
+
+        // 构建编辑消息的数据
+        $editData = [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'text' => $result['message'],
+            'parse_mode' => 'HTML',
+        ];
+
+        // 添加InlineKeyboard
+        if (!empty($result['inline_keyboard'])) {
+            $editData['reply_markup'] = json_encode(['inline_keyboard' => $result['inline_keyboard']]);
+        }
+
+        var_dump('======editMessageText data===', $editData);
+
+        // 编辑原消息
+        $editResult = $this->telegramBot->editMessageText($editData);
+
+        var_dump('======editMessageText result===', $editResult);
+
+        return (bool)$editResult;
+    }
+
+    /**
+     * 处理最近中奖分页回调
+     */
+    protected function handleWinsPageCallback(int $chatId, int $messageId, string $callbackQueryId, int $page, bool $isCn): bool
+    {
+        var_dump('======handleWinsPageCallback start===', $chatId, $messageId, $page, $isCn);
+
+        // 调用commandService获取指定页的中奖数据
+        $result = $this->commandService->handleRecentWinsCallback($chatId, $isCn, $page);
+
+        var_dump('======handleRecentWinsCallback result===', $result);
+
+        // 应答回调查询（移除加载状态）
+        $this->telegramBot->answerCallbackQuery(['callback_query_id' => $callbackQueryId]);
+
+        if (!$result['success']) {
+            var_dump('======handleWinsPageCallback failed===', $result['message'] ?? 'unknown error');
             return false;
         }
 

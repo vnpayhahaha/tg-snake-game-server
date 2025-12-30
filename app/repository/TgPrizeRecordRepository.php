@@ -233,4 +233,27 @@ class TgPrizeRecordRepository extends IRepository
             ->limit($limit)
             ->get();
     }
+
+    /**
+     * 获取群组中奖记录总数
+     */
+    public function getGroupPrizeCount(int $groupId): int
+    {
+        return $this->model::query()
+            ->where('group_id', $groupId)
+            ->count();
+    }
+
+    /**
+     * 获取群组中奖记录（分页）
+     */
+    public function getGroupRecentWinsPaginated(int $groupId, int $limit = 10, int $offset = 0): Collection
+    {
+        return $this->model::query()
+            ->where('group_id', $groupId)
+            ->orderByDesc('created_at')
+            ->offset($offset)
+            ->limit($limit)
+            ->get();
+    }
 }
