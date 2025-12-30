@@ -684,6 +684,9 @@ class TgBotCommandService
             $firstNode = $this->nodeService->findById($firstNodeId);
             $lastNode = $this->nodeService->findById($lastNodeId);
 
+            // 获取区间内所有节点（包含首尾和中间）
+            $allNodes = $this->nodeService->getNodesBetween($firstNodeId, $lastNodeId);
+
             // 计算中奖间隔（首尾之间的期数差）
             $prizeInterval = $lastNodeId - $firstNodeId;
 
@@ -706,14 +709,14 @@ class TgBotCommandService
                 $text .= "   💰 总奖金：{$record->prize_amount} TRX\n";
                 $text .= "   🕐 时间：{$record->created_at}\n";
                 $text .= "📋 中奖节点列表（第 {$page}/{$totalPages} 页）：\n";
-                // 只显示首尾两个中奖节点
-                if ($firstNode) {
-                    $walletSuffix = '...' . substr($firstNode->player_address, -8);
-                    $text .= "   1. {$firstNode->ticket_serial_no} | 🎫{$firstNode->ticket_number} | 💳{$walletSuffix}\n";
-                }
-                if ($lastNode && $firstNodeId != $lastNodeId) {
-                    $walletSuffix = '...' . substr($lastNode->player_address, -8);
-                    $text .= "   2. {$lastNode->ticket_serial_no} | 🎫{$lastNode->ticket_number} | 💳{$walletSuffix}\n";
+                // 展示区间内所有节点，区分中奖和未中奖
+                foreach ($allNodes as $index => $node) {
+                    $walletSuffix = '...' . substr($node->player_address, -8);
+                    $num = $index + 1;
+                    // 首尾节点标记为中奖🏆，中间节点标记为未中奖⚪
+                    $isWinner = ($node->id == $firstNodeId || $node->id == $lastNodeId);
+                    $statusIcon = $isWinner ? '🏆' : '⚪';
+                    $text .= "   {$num}. {$statusIcon} {$node->ticket_serial_no} | 🎫{$node->ticket_number} | 💳{$walletSuffix}\n";
                 }
                 $text .= "\n";
             } else {
@@ -731,14 +734,14 @@ class TgBotCommandService
                 $text .= "   💰 Prize: {$record->prize_amount} TRX\n";
                 $text .= "   🕐 Time: {$record->created_at}\n";
                 $text .= "📋 Winner Nodes (Page {$page}/{$totalPages}):\n";
-                // 只显示首尾两个中奖节点
-                if ($firstNode) {
-                    $walletSuffix = '...' . substr($firstNode->player_address, -8);
-                    $text .= "   1. {$firstNode->ticket_serial_no} | 🎫{$firstNode->ticket_number} | 💳{$walletSuffix}\n";
-                }
-                if ($lastNode && $firstNodeId != $lastNodeId) {
-                    $walletSuffix = '...' . substr($lastNode->player_address, -8);
-                    $text .= "   2. {$lastNode->ticket_serial_no} | 🎫{$lastNode->ticket_number} | 💳{$walletSuffix}\n";
+                // 展示区间内所有节点，区分中奖和未中奖
+                foreach ($allNodes as $index => $node) {
+                    $walletSuffix = '...' . substr($node->player_address, -8);
+                    $num = $index + 1;
+                    // 首尾节点标记为中奖🏆，中间节点标记为未中奖⚪
+                    $isWinner = ($node->id == $firstNodeId || $node->id == $lastNodeId);
+                    $statusIcon = $isWinner ? '🏆' : '⚪';
+                    $text .= "   {$num}. {$statusIcon} {$node->ticket_serial_no} | 🎫{$node->ticket_number} | 💳{$walletSuffix}\n";
                 }
                 $text .= "\n";
             }
