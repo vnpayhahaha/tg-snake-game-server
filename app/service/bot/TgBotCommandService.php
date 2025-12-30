@@ -631,10 +631,11 @@ class TgBotCommandService
      * 最近中奖命令
      * @param int $chatId 群组ID
      * @param bool $isCn 是否中文
-     * @param int $page 页码（从1开始）
+     * @param int $recordIndex 中奖记录索引（从0开始）
+     * @param int $nodePage 节点列表页码（从1开始）
      * @return array
      */
-    protected function handleRecentWins(int $chatId, bool $isCn, int $page = 1): array
+    protected function handleRecentWins(int $chatId, bool $isCn, int $recordIndex = 0, int $nodePage = 1): array
     {
         $config = $this->configService->getByTgChatId($chatId);
         if (!$config) {
@@ -652,130 +653,154 @@ class TgBotCommandService
             ];
         }
 
-        $perPage = 10; // 每页显示10条
-        $page = max(1, $page);
-
         // 获取中奖记录总数
-        $totalCount = $this->prizeService->getGroupPrizeCount($group->id);
-        $totalPages = max(1, ceil($totalCount / $perPage));
-        $page = min($page, $totalPages);
+        $totalRecords = $this->prizeService->getGroupPrizeCount($group->id);
 
-        if ($totalCount == 0) {
+        if ($totalRecords == 0) {
             return [
                 'success' => true,
                 'message' => $isCn ? '暂无中奖记录' : 'No winning records yet',
             ];
         }
 
-        // 获取分页的中奖记录
-        $offset = ($page - 1) * $perPage;
-        $recentWins = $this->prizeService->getGroupRecentWinsPaginated($group->id, $perPage, $offset);
+        $recordIndex = max(0, min($recordIndex, $totalRecords - 1));
+
+        // 获取单条中奖记录
+        $recentWins = $this->prizeService->getGroupRecentWinsPaginated($group->id, 1, $recordIndex);
+        if ($recentWins->isEmpty()) {
+            return [
+                'success' => true,
+                'message' => $isCn ? '暂无中奖记录' : 'No winning records yet',
+            ];
+        }
+
+        /** @var \app\model\ModelTgPrizeRecord $record */
+        $record = $recentWins->first();
+
+        // 根据首尾节点ID查询中奖节点
+        $firstNodeId = $record->winner_node_id_first;
+        $lastNodeId = $record->winner_node_id_last;
+
+        // 获取首尾中奖节点详情
+        $firstNode = $this->nodeService->findById($firstNodeId);
+        $lastNode = $this->nodeService->findById($lastNodeId);
+
+        // 获取区间内所有节点（包含首尾和中间）
+        $allNodes = $this->nodeService->getNodesBetween($firstNodeId, $lastNodeId);
+
+        // 节点列表分页
+        $nodesPerPage = 10;
+        $totalNodes = $allNodes->count();
+        $totalNodePages = max(1, ceil($totalNodes / $nodesPerPage));
+        $nodePage = max(1, min($nodePage, $totalNodePages));
+        $nodeOffset = ($nodePage - 1) * $nodesPerPage;
+        $pageNodes = $allNodes->slice($nodeOffset, $nodesPerPage);
+
+        // 计算中奖间隔（首尾之间的期数差）
+        $prizeInterval = $lastNodeId - $firstNodeId;
+
+        // 判断中奖人数（首尾是否同一人）
+        $isSamePerson = $firstNode && $lastNode && $firstNode->player_address === $lastNode->player_address;
+        $actualWinnerCount = $isSamePerson ? 1 : 2;
+
+        $currentRecordNum = $recordIndex + 1;
 
         $text = $isCn
-            ? "🎊 最近中奖记录\n\n"
-            : "🎊 Recent Winners\n\n";
+            ? "🎊 最近中奖记录（第 {$currentRecordNum}/{$totalRecords} 条）\n\n"
+            : "🎊 Recent Winners (Record {$currentRecordNum}/{$totalRecords})\n\n";
 
-        foreach ($recentWins as $record) {
-            // 根据首尾节点ID查询中奖节点
-            $firstNodeId = $record->winner_node_id_first;
-            $lastNodeId = $record->winner_node_id_last;
-
-            // 获取首尾中奖节点详情
-            $firstNode = $this->nodeService->findById($firstNodeId);
-            $lastNode = $this->nodeService->findById($lastNodeId);
-
-            // 获取区间内所有节点（包含首尾和中间）
-            $allNodes = $this->nodeService->getNodesBetween($firstNodeId, $lastNodeId);
-
-            // 计算中奖间隔（首尾之间的期数差）
-            $prizeInterval = $lastNodeId - $firstNodeId;
-
-            // 判断中奖人数（首尾是否同一人）
-            $isSamePerson = $firstNode && $lastNode && $firstNode->player_address === $lastNode->player_address;
-            $actualWinnerCount = $isSamePerson ? 1 : 2;
-
-            if ($isCn) {
-                $text .= "🏆 中奖流水号：{$record->prize_serial_no}\n";
-                $text .= "   🎫 中奖票号：{$record->ticket_number}\n";
-                $text .= "   📏 中奖间隔：{$prizeInterval} 期\n";
-                $text .= "   👥 中奖人数：{$actualWinnerCount} 人\n";
-                // 展示首尾中奖地址
-                if ($firstNode) {
-                    $text .= "   💳 首中奖地址：{$firstNode->player_address}\n";
-                }
-                if ($lastNode && $firstNodeId != $lastNodeId) {
-                    $text .= "   💳 尾中奖地址：{$lastNode->player_address}\n";
-                }
-                $text .= "   💰 总奖金：{$record->prize_amount} TRX\n";
-                $text .= "   🕐 时间：{$record->created_at}\n";
-                $text .= "📋 中奖节点列表（第 {$page}/{$totalPages} 页）：\n";
-                // 展示区间内所有节点，区分中奖和未中奖
-                foreach ($allNodes as $index => $node) {
-                    $walletSuffix = '...' . substr($node->player_address, -8);
-                    $num = $index + 1;
-                    // 首尾节点标记为中奖🏆，中间节点标记为未中奖⚪
-                    $isWinner = ($node->id == $firstNodeId || $node->id == $lastNodeId);
-                    $statusIcon = $isWinner ? '🏆' : '⚪';
-                    $text .= "   {$num}. {$statusIcon} {$node->ticket_serial_no} | 🎫{$node->ticket_number} | 💳{$walletSuffix}\n";
-                }
-                $text .= "\n";
-            } else {
-                $text .= "🏆 Prize Serial: {$record->prize_serial_no}\n";
-                $text .= "   🎫 Ticket: {$record->ticket_number}\n";
-                $text .= "   📏 Interval: {$prizeInterval} rounds\n";
-                $text .= "   👥 Winners: {$actualWinnerCount}\n";
-                // 展示首尾中奖地址
-                if ($firstNode) {
-                    $text .= "   💳 First Winner: {$firstNode->player_address}\n";
-                }
-                if ($lastNode && $firstNodeId != $lastNodeId) {
-                    $text .= "   💳 Last Winner: {$lastNode->player_address}\n";
-                }
-                $text .= "   💰 Prize: {$record->prize_amount} TRX\n";
-                $text .= "   🕐 Time: {$record->created_at}\n";
-                $text .= "📋 Winner Nodes (Page {$page}/{$totalPages}):\n";
-                // 展示区间内所有节点，区分中奖和未中奖
-                foreach ($allNodes as $index => $node) {
-                    $walletSuffix = '...' . substr($node->player_address, -8);
-                    $num = $index + 1;
-                    // 首尾节点标记为中奖🏆，中间节点标记为未中奖⚪
-                    $isWinner = ($node->id == $firstNodeId || $node->id == $lastNodeId);
-                    $statusIcon = $isWinner ? '🏆' : '⚪';
-                    $text .= "   {$num}. {$statusIcon} {$node->ticket_serial_no} | 🎫{$node->ticket_number} | 💳{$walletSuffix}\n";
-                }
-                $text .= "\n";
+        if ($isCn) {
+            $text .= "🏆 中奖流水号：{$record->prize_serial_no}\n";
+            $text .= "   🎫 中奖票号：{$record->ticket_number}\n";
+            $text .= "   📏 中奖间隔：{$prizeInterval} 期\n";
+            $text .= "   👥 中奖人数：{$actualWinnerCount} 人\n";
+            if ($firstNode) {
+                $text .= "   💳 首中奖地址：{$firstNode->player_address}\n";
             }
+            if ($lastNode && $firstNodeId != $lastNodeId) {
+                $text .= "   💳 尾中奖地址：{$lastNode->player_address}\n";
+            }
+            $text .= "   💰 总奖金：{$record->prize_amount} TRX\n";
+            $text .= "   🕐 时间：{$record->created_at}\n";
+            $text .= "📋 节点列表（第 {$nodePage}/{$totalNodePages} 页，共 {$totalNodes} 个）：\n";
+        } else {
+            $text .= "🏆 Prize Serial: {$record->prize_serial_no}\n";
+            $text .= "   🎫 Ticket: {$record->ticket_number}\n";
+            $text .= "   📏 Interval: {$prizeInterval} rounds\n";
+            $text .= "   👥 Winners: {$actualWinnerCount}\n";
+            if ($firstNode) {
+                $text .= "   💳 First Winner: {$firstNode->player_address}\n";
+            }
+            if ($lastNode && $firstNodeId != $lastNodeId) {
+                $text .= "   💳 Last Winner: {$lastNode->player_address}\n";
+            }
+            $text .= "   💰 Prize: {$record->prize_amount} TRX\n";
+            $text .= "   🕐 Time: {$record->created_at}\n";
+            $text .= "📋 Nodes (Page {$nodePage}/{$totalNodePages}, Total {$totalNodes}):\n";
+        }
+
+        // 展示当前页的节点
+        foreach ($pageNodes as $index => $node) {
+            $walletSuffix = '...' . substr($node->player_address, -8);
+            $num = $nodeOffset + $index + 1;
+            $isWinner = ($node->id == $firstNodeId || $node->id == $lastNodeId);
+            $statusIcon = $isWinner ? '🏆' : '⚪';
+            $text .= "   {$num}. {$statusIcon} {$node->ticket_serial_no} | 🎫{$node->ticket_number} | 💳{$walletSuffix}\n";
         }
 
         // 构建分页按钮
-        $inlineKeyboard = null;
-        if ($totalPages > 1) {
-            $buttons = [];
+        $buttons = [];
+        $langFlag = $isCn ? '1' : '0';
 
-            // 上一页按钮
-            if ($page > 1) {
-                $buttons[] = [
-                    'text' => $isCn ? '⬅️ 上一页' : '⬅️ Prev',
-                    'callback_data' => "wins_page:" . ($page - 1) . ":" . ($isCn ? '1' : '0'),
-                ];
-            }
-
-            // 页码显示
-            $buttons[] = [
-                'text' => "{$page}/{$totalPages}",
-                'callback_data' => "wins_page:{$page}:" . ($isCn ? '1' : '0'),
+        // 第一行：节点列表翻页
+        $nodeButtons = [];
+        if ($nodePage > 1) {
+            $nodeButtons[] = [
+                'text' => $isCn ? '⬅️ 上页节点' : '⬅️ Prev Nodes',
+                'callback_data' => "wins_page:{$recordIndex}:" . ($nodePage - 1) . ":{$langFlag}",
             ];
-
-            // 下一页按钮
-            if ($page < $totalPages) {
-                $buttons[] = [
-                    'text' => $isCn ? '下一页 ➡️' : 'Next ➡️',
-                    'callback_data' => "wins_page:" . ($page + 1) . ":" . ($isCn ? '1' : '0'),
-                ];
-            }
-
-            $inlineKeyboard = [$buttons];
         }
+        if ($totalNodePages > 1) {
+            $nodeButtons[] = [
+                'text' => "{$nodePage}/{$totalNodePages}",
+                'callback_data' => "wins_page:{$recordIndex}:{$nodePage}:{$langFlag}",
+            ];
+        }
+        if ($nodePage < $totalNodePages) {
+            $nodeButtons[] = [
+                'text' => $isCn ? '下页节点 ➡️' : 'Next Nodes ➡️',
+                'callback_data' => "wins_page:{$recordIndex}:" . ($nodePage + 1) . ":{$langFlag}",
+            ];
+        }
+        if (!empty($nodeButtons)) {
+            $buttons[] = $nodeButtons;
+        }
+
+        // 第二行：中奖记录切换
+        $recordButtons = [];
+        if ($recordIndex > 0) {
+            $recordButtons[] = [
+                'text' => $isCn ? '⏮️ 上一条' : '⏮️ Prev Record',
+                'callback_data' => "wins_page:" . ($recordIndex - 1) . ":1:{$langFlag}",
+            ];
+        }
+        if ($totalRecords > 1) {
+            $recordButtons[] = [
+                'text' => "{$currentRecordNum}/{$totalRecords}",
+                'callback_data' => "wins_page:{$recordIndex}:1:{$langFlag}",
+            ];
+        }
+        if ($recordIndex < $totalRecords - 1) {
+            $recordButtons[] = [
+                'text' => $isCn ? '下一条 ⏭️' : 'Next Record ⏭️',
+                'callback_data' => "wins_page:" . ($recordIndex + 1) . ":1:{$langFlag}",
+            ];
+        }
+        if (!empty($recordButtons)) {
+            $buttons[] = $recordButtons;
+        }
+
+        $inlineKeyboard = !empty($buttons) ? $buttons : null;
 
         return [
             'success' => true,
@@ -788,12 +813,13 @@ class TgBotCommandService
      * 最近中奖分页回调处理（供TelegramService调用）
      * @param int $chatId 群组ID
      * @param bool $isCn 是否中文
-     * @param int $page 页码
+     * @param int $recordIndex 中奖记录索引（从0开始）
+     * @param int $nodePage 节点列表页码（从1开始）
      * @return array
      */
-    public function handleRecentWinsCallback(int $chatId, bool $isCn, int $page): array
+    public function handleRecentWinsCallback(int $chatId, bool $isCn, int $recordIndex, int $nodePage): array
     {
-        return $this->handleRecentWins($chatId, $isCn, $page);
+        return $this->handleRecentWins($chatId, $isCn, $recordIndex, $nodePage);
     }
 
     /**

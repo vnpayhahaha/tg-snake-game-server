@@ -83,10 +83,11 @@ class TelegramService
                     $isCn = ($parts[2] ?? '1') === '1';
                     return $this->handleSnakePageCallback($chatId, $messageId, $callbackQueryId, $page, $isCn);
                 case 'wins_page':
-                    // 最近中奖分页: wins_page:页码:是否中文(1/0)
-                    $page = (int)($parts[1] ?? 1);
-                    $isCn = ($parts[2] ?? '1') === '1';
-                    return $this->handleWinsPageCallback($chatId, $messageId, $callbackQueryId, $page, $isCn);
+                    // 最近中奖分页: wins_page:记录索引:节点页码:是否中文(1/0)
+                    $recordIndex = (int)($parts[1] ?? 0);
+                    $nodePage = (int)($parts[2] ?? 1);
+                    $isCn = ($parts[3] ?? '1') === '1';
+                    return $this->handleWinsPageCallback($chatId, $messageId, $callbackQueryId, $recordIndex, $nodePage, $isCn);
                 default:
                     // 未知回调，应答但不做任何操作
                     $this->telegramBot->answerCallbackQuery(['callback_query_id' => $callbackQueryId]);
@@ -149,12 +150,12 @@ class TelegramService
     /**
      * 处理最近中奖分页回调
      */
-    protected function handleWinsPageCallback(int $chatId, int $messageId, string $callbackQueryId, int $page, bool $isCn): bool
+    protected function handleWinsPageCallback(int $chatId, int $messageId, string $callbackQueryId, int $recordIndex, int $nodePage, bool $isCn): bool
     {
-        var_dump('======handleWinsPageCallback start===', $chatId, $messageId, $page, $isCn);
+        var_dump('======handleWinsPageCallback start===', $chatId, $messageId, $recordIndex, $nodePage, $isCn);
 
-        // 调用commandService获取指定页的中奖数据
-        $result = $this->commandService->handleRecentWinsCallback($chatId, $isCn, $page);
+        // 调用commandService获取指定记录和节点页的中奖数据
+        $result = $this->commandService->handleRecentWinsCallback($chatId, $isCn, $recordIndex, $nodePage);
 
         var_dump('======handleRecentWinsCallback result===', $result);
 
