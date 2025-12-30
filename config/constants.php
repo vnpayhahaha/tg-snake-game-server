@@ -48,4 +48,19 @@ return [
     'tenant_notification_queue' => app\constants\TenantNotificationQueue::class,
     // ChannelCallbackRecord
     'channel_callback_record'   => app\constants\ChannelCallbackRecord::class,
+    // TG游戏相关常量
+    'tg_game_group_config'      => app\constants\TgGameGroupConfig::class,
+    // TG游戏群组配置
+    'tg_snake_node'             => app\constants\TgSnakeNode::class,
+    // TG贪吃蛇节点
+    'tg_prize_record'           => app\constants\TgPrizeRecord::class,
+    // TG中奖记录
+    'tg_prize_transfer'         => app\constants\TgPrizeTransfer::class,
+    // TG奖金转账
+    'tg_tron_transaction_log'   => app\constants\TgTronTransactionLog::class,
+    // TG TRON交易日志
+    'tg_prize_dispatch_queue'   => app\constants\TgPrizeDispatchQueue::class,
+    // TG奖金派发队列
+    'tg_player_wallet_binding_log' => app\constants\TgPlayerWalletBindingLog::class,
+    // TG玩家钱包绑定日志
 ];
