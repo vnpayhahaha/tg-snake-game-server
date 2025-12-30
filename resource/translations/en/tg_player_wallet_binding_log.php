@@ -5,6 +5,7 @@ return [
         'change_type' => [
             1 => 'First Bind',
             2 => 'Update Bind',
+            3 => 'Unbind',
         ],
     ],
 ];
