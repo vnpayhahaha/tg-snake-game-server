@@ -180,6 +180,7 @@ class TgTronMonitorService extends BaseService
             // 创建节点
             $nodeResult = $this->nodeService->createNode([
                 'group_id' => $groupId,
+                'wallet_address' => $txData['to_address'],
                 'player_address' => $txData['from_address'],
                 'player_tg_user_id' => $binding ? $binding->tg_user_id : null,
                 'player_tg_username' => $binding ? $binding->tg_username : null,
