@@ -91,7 +91,8 @@ class TgSnakeNodeService extends BaseService
                 'ticket_number' => $ticket,
                 'ticket_serial_no' => $ticketSerialNo,
                 'status' => NodeConst::STATUS_ACTIVE,
-                'matched_prize_id' => null,
+                'matched_prize_id' => 0,
+                'matched_prize_node_id' => 0,
             ]);
 
             Db::commit();

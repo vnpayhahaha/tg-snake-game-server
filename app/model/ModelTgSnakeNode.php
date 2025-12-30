@@ -20,6 +20,7 @@ use Carbon\Carbon;
 * @property int $daily_sequence 当天第几笔交易（从1开始）
 * @property int $status 状态:1=活跃,2=已中奖,3=未中奖
 * @property int $matched_prize_id 匹配的中奖记录ID
+* @property int $matched_prize_node_id 匹配中奖节点id
 * @property Carbon $created_at 创建时间
 */
 final class ModelTgSnakeNode extends BasicModel
@@ -55,6 +56,7 @@ final class ModelTgSnakeNode extends BasicModel
         'daily_sequence',
         'status',
         'matched_prize_id',
+        'matched_prize_node_id',
         'created_at'
     ];
 }

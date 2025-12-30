@@ -329,8 +329,23 @@ class TgPrizeService extends BaseService
             'version' => 1,
         ]);
 
-        // 标记节点为已中奖
-        $this->nodeRepository->markAsMatched($nodeIds, $prizeRecord->id);
+        // 标记节点为已中奖，并设置互相匹配的节点ID
+        // 首尾两个节点互相匹配
+        $startNodeId = $rangeData['start_node']->id;
+        $endNodeId = $rangeData['end_node']->id;
+
+        // 首节点的匹配节点是尾节点
+        $this->nodeRepository->markAsMatchedWithPairNode($startNodeId, $prizeRecord->id, $endNodeId);
+        // 尾节点的匹配节点是首节点
+        $this->nodeRepository->markAsMatchedWithPairNode($endNodeId, $prizeRecord->id, $startNodeId);
+
+        // 中间节点（如果有）只标记中奖，不设置匹配节点ID
+        $middleNodeIds = array_filter($nodeIds, function($id) use ($startNodeId, $endNodeId) {
+            return $id != $startNodeId && $id != $endNodeId;
+        });
+        if (!empty($middleNodeIds)) {
+            $this->nodeRepository->markAsMatched($middleNodeIds, $prizeRecord->id);
+        }
 
         // 创建派奖任务
         $this->createDispatchTasks($prizeRecord, $nodes);

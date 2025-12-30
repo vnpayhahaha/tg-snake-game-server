@@ -173,7 +173,46 @@ class TgSnakeNodeRepository extends IRepository
             ->update([
                 'status' => NodeConst::STATUS_MATCHED,
                 'matched_prize_id' => $prizeRecordId,
+                'matched_prize_node_id' => 0,
             ]);
+    }
+
+    /**
+     * 标记节点为已中奖（带匹配节点ID）
+     * 用于两两匹配的中奖场景
+     * @param int $nodeId 节点ID
+     * @param int $prizeRecordId 中奖记录ID
+     * @param int $matchedNodeId 匹配的节点ID
+     */
+    public function markAsMatchedWithPairNode(int $nodeId, int $prizeRecordId, int $matchedNodeId): int
+    {
+        return $this->model::query()
+            ->where('id', $nodeId)
+            ->update([
+                'status' => NodeConst::STATUS_MATCHED,
+                'matched_prize_id' => $prizeRecordId,
+                'matched_prize_node_id' => $matchedNodeId,
+            ]);
+    }
+
+    /**
+     * 批量标记节点为已中奖（带匹配节点ID）
+     * @param array $nodeMatchPairs 节点匹配对数组 [['node_id' => x, 'matched_node_id' => y], ...]
+     * @param int $prizeRecordId 中奖记录ID
+     */
+    public function batchMarkAsMatchedWithPairNodes(array $nodeMatchPairs, int $prizeRecordId): int
+    {
+        $updated = 0;
+        foreach ($nodeMatchPairs as $pair) {
+            $updated += $this->model::query()
+                ->where('id', $pair['node_id'])
+                ->update([
+                    'status' => NodeConst::STATUS_MATCHED,
+                    'matched_prize_id' => $prizeRecordId,
+                    'matched_prize_node_id' => $pair['matched_node_id'],
+                ]);
+        }
+        return $updated;
     }
 
     /**
@@ -238,7 +277,7 @@ class TgSnakeNodeRepository extends IRepository
         return $this->model::query()
             ->where('group_id', $groupId)
             ->where('player_tg_user_id', $tgUserId)
-            ->whereNotNull('matched_prize_id')
+            ->where('matched_prize_id', '>', 0)
             ->pluck('matched_prize_id')
             ->unique()
             ->toArray();
