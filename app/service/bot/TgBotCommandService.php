@@ -706,8 +706,8 @@ class TgBotCommandService
         $currentRecordNum = $recordIndex + 1;
 
         $text = $isCn
-            ? "🎊 最近中奖记录（第 {$currentRecordNum}/{$totalRecords} 条）\n\n"
-            : "🎊 Recent Winners (Record {$currentRecordNum}/{$totalRecords})\n\n";
+            ? "🎊 最近中奖记录\n\n"
+            : "🎊 Recent Winners\n\n";
 
         if ($isCn) {
             $text .= "🏆 中奖流水号：{$record->prize_serial_no}\n";
