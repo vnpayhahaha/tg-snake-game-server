@@ -178,6 +178,14 @@ class TgSnakeNodeService extends BaseService
     }
 
     /**
+     * 获取玩家所有节点（通过Telegram用户ID，按时间倒排）
+     */
+    public function getPlayerAllNodes(int $groupId, int $tgUserId, int $limit = 50)
+    {
+        return $this->repository->getPlayerAllNodesByTgUserId($groupId, $tgUserId, $limit);
+    }
+
+    /**
      * 根据凭证流水号查询
      */
     public function findByTicketSerialNo(string $serialNo)

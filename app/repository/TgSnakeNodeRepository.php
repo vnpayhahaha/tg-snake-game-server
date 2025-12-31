@@ -270,6 +270,19 @@ class TgSnakeNodeRepository extends IRepository
     }
 
     /**
+     * 获取玩家所有节点（通过Telegram用户ID，按时间倒排）
+     */
+    public function getPlayerAllNodesByTgUserId(int $groupId, int $tgUserId, int $limit = 50): Collection
+    {
+        return $this->model::query()
+            ->where('group_id', $groupId)
+            ->where('player_tg_user_id', $tgUserId)
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
      * 获取玩家已中奖的节点对应的中奖记录ID（通过Telegram用户ID）
      */
     public function getPlayerMatchedPrizeIds(int $groupId, int $tgUserId): array

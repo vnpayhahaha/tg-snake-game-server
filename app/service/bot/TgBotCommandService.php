@@ -516,8 +516,8 @@ class TgBotCommandService
             ];
         }
 
-        // 获取用户在当前蛇身中的节点
-        $nodes = $this->nodeService->getPlayerActiveNodes($group->id, $userId);
+        // 获取用户所有参与游戏的节点（按时间倒排）
+        $nodes = $this->nodeService->getPlayerAllNodes($group->id, $userId, 50);
 
         if ($nodes->isEmpty()) {
             return [
@@ -526,19 +526,44 @@ class TgBotCommandService
             ];
         }
 
-        $ticketList = $nodes->map(function ($node) use ($isCn) {
-            return $isCn
-                ? "票号：{$node->ticket_number} | 投注：{$node->amount} TRX | 流水号：{$node->ticket_serial_no}"
-                : "Ticket: {$node->ticket_number} | Bet: {$node->amount} TRX | Serial: {$node->ticket_serial_no}";
-        })->join("\n");
+        // 状态图标映射
+        $statusIcons = [
+            1 => '🟢', // 活跃
+            2 => '🏆', // 已中奖
+            3 => '💰', // 已派奖
+            4 => '⚪', // 已归档
+        ];
+        $statusNames = $isCn ? [
+            1 => '活跃',
+            2 => '已中奖',
+            3 => '已派奖',
+            4 => '已归档',
+        ] : [
+            1 => 'Active',
+            2 => 'Won',
+            3 => 'Paid',
+            4 => 'Archived',
+        ];
 
         $text = $isCn
-            ? "🎫 我的票号\n\n" .
-              "总数：{$nodes->count()}\n\n" .
-              $ticketList
-            : "🎫 My Tickets\n\n" .
-              "Total: {$nodes->count()}\n\n" .
-              $ticketList;
+            ? "🎫 我的票号（共 {$nodes->count()} 条）\n\n"
+            : "🎫 My Tickets (Total: {$nodes->count()})\n\n";
+
+        foreach ($nodes as $index => $node) {
+            $num = $index + 1;
+            $statusIcon = $statusIcons[$node->status] ?? '❓';
+            $statusName = $statusNames[$node->status] ?? ($isCn ? '未知' : 'Unknown');
+            $walletSuffix = '...' . substr($node->player_address, -8);
+
+            $text .= "{$num}. {$statusIcon} {$node->ticket_serial_no}\n";
+            $text .= "   🎫 {$node->ticket_number} | 💳{$walletSuffix} | {$statusName}\n";
+        }
+
+        // 添加图例说明
+        $text .= "\n";
+        $text .= $isCn
+            ? "━━━━━━━━━━━━━━━━━━━━\n图例：🟢活跃 🏆已中奖 💰已派奖 ⚪已归档"
+            : "━━━━━━━━━━━━━━━━━━━━\nLegend: 🟢Active 🏆Won 💰Paid ⚪Archived";
 
         return ['success' => true, 'message' => $text];
     }

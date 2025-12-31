@@ -86,7 +86,8 @@ class TgPrizeService extends BaseService
             }
 
             // 获取当前活跃节点（按创建时间排序）
-            $activeNodes = $this->nodeRepository->getActiveNodes($groupId, $config->wallet_change_count);
+            // 钱包变更后不清空蛇身，所有活跃节点继续参与中奖匹配
+            $activeNodes = $this->nodeRepository->getActiveNodes($groupId);
             if ($activeNodes->isEmpty()) {
                 Db::commit();
                 return ['matched' => false, 'message' => '没有活跃节点'];

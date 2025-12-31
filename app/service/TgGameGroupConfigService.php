@@ -238,17 +238,9 @@ class TgGameGroupConfigService extends BaseService
                 throw new \Exception('冷却期未结束，无法完成变更');
             }
 
-            // 归档旧钱包周期的节点
-            $oldWalletCycle = $config->wallet_change_count;
-            $archivedCount = $this->snakeNodeRepository->archiveNodes(
-                $config->id,
-                $oldWalletCycle
-            );
-
-            Log::info("归档节点数量: {$archivedCount}, 群组: {$config->id}, 钱包周期: {$oldWalletCycle}");
-
-            // 完成变更
-            $newWalletCycle = $oldWalletCycle + 1;
+            // 钱包变更不再清空蛇身，节点继续拼接参与中奖匹配
+            // 只更新钱包周期计数
+            $newWalletCycle = $config->wallet_change_count + 1;
             $success = $this->repository->completeWalletChange(
                 $id,
                 $config->pending_wallet_address,
@@ -276,7 +268,6 @@ class TgGameGroupConfigService extends BaseService
                 'message' => '钱包变更完成',
                 'new_address' => $config->pending_wallet_address,
                 'new_wallet_cycle' => $newWalletCycle,
-                'archived_nodes' => $archivedCount,
             ];
         } catch (\Exception $e) {
             Db::rollBack();
