@@ -107,7 +107,6 @@ class WalletChangeCheckProcess
                 'group_id' => $config->id,
                 'new_address' => $result['new_address'],
                 'new_wallet_cycle' => $result['new_wallet_cycle'],
-                'archived_nodes' => $result['archived_nodes'],
             ]);
 
             // 发送Telegram通知给群组管理员
@@ -131,9 +130,8 @@ class WalletChangeCheckProcess
             $message = "🔄 钱包变更完成通知\n\n" .
                       "群组：{$config->tg_chat_title}\n" .
                       "新钱包地址：{$result['new_address']}\n" .
-                      "钱包周期：#{$result['new_wallet_cycle']}\n" .
-                      "归档节点数：{$result['archived_nodes']}\n\n" .
-                      "✅ 钱包变更已完成，系统已恢复正常运行";
+                      "钱包周期：#{$result['new_wallet_cycle']}\n\n" .
+                      "✅ 钱包变更已完成，蛇身节点继续保留参与游戏";
 
             TelegramBotHelper::send($config->tg_chat_id, $message);
 

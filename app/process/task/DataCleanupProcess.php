@@ -3,7 +3,6 @@
 namespace app\process\task;
 
 use app\constants\TgPrizeDispatchQueue as QueueConst;
-use app\constants\TgSnakeNode as NodeConst;
 use Carbon\Carbon;
 use support\Db;
 use support\Log;
@@ -42,9 +41,6 @@ class DataCleanupProcess
 
         $startTime = microtime(true);
 
-        // 清理已归档的旧节点（保留90天）
-        $archivedNodesDeleted = $this->cleanupArchivedNodes(90);
-
         // 清理已完成的派发队列记录（保留30天）
         $queueRecordsDeleted = $this->cleanupCompletedQueueRecords(30);
 
@@ -59,40 +55,10 @@ class DataCleanupProcess
 
         Log::info("DataCleanupProcess: 清理完成", [
             'duration_seconds' => $duration,
-            'archived_nodes_deleted' => $archivedNodesDeleted,
             'queue_records_deleted' => $queueRecordsDeleted,
             'tx_logs_deleted' => $txLogsDeleted,
             'cancelled_queue_deleted' => $cancelledQueueDeleted,
         ]);
-    }
-
-    /**
-     * 清理已归档的旧节点
-     * @param int $daysToKeep 保留天数
-     * @return int 删除的记录数
-     */
-    protected function cleanupArchivedNodes(int $daysToKeep): int
-    {
-        try {
-            $cutoffDate = Carbon::now()->subDays($daysToKeep);
-
-            $deleted = Db::table('tg_snake_node')
-                ->where('status', NodeConst::STATUS_ARCHIVED)
-                ->where('updated_at', '<', $cutoffDate)
-                ->delete();
-
-            Log::info("清理已归档节点", [
-                'days_to_keep' => $daysToKeep,
-                'cutoff_date' => $cutoffDate->toDateString(),
-                'deleted' => $deleted,
-            ]);
-
-            return $deleted;
-
-        } catch (\Throwable $e) {
-            Log::error("清理已归档节点失败: " . $e->getMessage());
-            return 0;
-        }
     }
 
     /**

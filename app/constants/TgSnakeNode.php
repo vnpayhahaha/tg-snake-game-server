@@ -8,16 +8,14 @@ class TgSnakeNode
 {
     use ConstantsOptionTrait;
 
-    // 节点状态: 1-活跃 2-已中奖 3-已派奖 4-已归档
+    // 节点状态: 1-活跃 2-已中奖 3-未中奖
     public const STATUS_ACTIVE = 1;
     public const STATUS_MATCHED = 2;
-    public const STATUS_TRANSFERRED = 3;
-    public const STATUS_ARCHIVED = 4;
+    public const STATUS_CANCELLED = 3;
     public static array $status_list = [
-        self::STATUS_ACTIVE      => 'tg_snake_node.enums.status.1',
-        self::STATUS_MATCHED     => 'tg_snake_node.enums.status.2',
-        self::STATUS_TRANSFERRED => 'tg_snake_node.enums.status.3',
-        self::STATUS_ARCHIVED    => 'tg_snake_node.enums.status.4',
+        self::STATUS_ACTIVE    => 'tg_snake_node.enums.status.1',
+        self::STATUS_MATCHED   => 'tg_snake_node.enums.status.2',
+        self::STATUS_CANCELLED => 'tg_snake_node.enums.status.3',
     ];
 
     // 凭证号前缀

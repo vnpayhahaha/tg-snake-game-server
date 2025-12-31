@@ -138,14 +138,6 @@ class TgSnakeNodeService extends BaseService
     }
 
     /**
-     * 归档节点（钱包变更时）
-     */
-    public function archiveNodes(int $groupId, int $walletCycle): int
-    {
-        return $this->repository->archiveNodes($groupId, $walletCycle);
-    }
-
-    /**
      * 标记节点为已中奖
      */
     public function markAsMatched(array $nodeIds, int $prizeRecordId): int
@@ -262,18 +254,6 @@ class TgSnakeNodeService extends BaseService
     }
 
     /**
-     * 获取群组的归档节点
-     */
-    public function getArchivedNodesByGroup(int $groupId, int $limit = 100)
-    {
-        $params = [
-            'group_id' => $groupId,
-            'status' => NodeConst::STATUS_ARCHIVED,
-        ];
-        return $this->repository->list($params)->take($limit);
-    }
-
-    /**
      * 根据玩家获取节点
      */
     public function getNodesByPlayer(string $playerAddress, int $groupId = null, int $limit = 50)
@@ -303,64 +283,6 @@ class TgSnakeNodeService extends BaseService
     public function getExportData(array $params, int $limit = 10000)
     {
         return $this->repository->list($params)->take($limit);
-    }
-
-    /**
-     * 归档单个节点
-     */
-    public function archiveNode(int $id): array
-    {
-        try {
-            $node = $this->repository->findById($id);
-            if (!$node) {
-                return [
-                    'success' => false,
-                    'message' => '节点不存在',
-                ];
-            }
-
-            if ($node->status == NodeConst::STATUS_ARCHIVED) {
-                return [
-                    'success' => false,
-                    'message' => '节点已归档',
-                ];
-            }
-
-            $this->repository->updateById($id, ['status' => NodeConst::STATUS_ARCHIVED]);
-
-            return [
-                'success' => true,
-                'message' => '节点已归档',
-            ];
-        } catch (\Exception $e) {
-            Log::error('归档节点失败: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => $e->getMessage(),
-            ];
-        }
-    }
-
-    /**
-     * 批量归档节点
-     */
-    public function batchArchiveNodes(array $nodeIds): array
-    {
-        try {
-            $updated = $this->repository->archiveNodesByIds($nodeIds);
-
-            return [
-                'success' => true,
-                'message' => "已归档 {$updated} 个节点",
-                'count' => $updated,
-            ];
-        } catch (\Exception $e) {
-            Log::error('批量归档节点失败: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => $e->getMessage(),
-            ];
-        }
     }
 
     /**

@@ -228,7 +228,8 @@ class TgPlayerWalletBindingService extends BaseService
             return [
                 'total_nodes' => 0,
                 'active_nodes' => 0,
-                'archived_nodes' => 0,
+                'matched_nodes' => 0,
+                'cancelled_nodes' => 0,
                 'total_amount' => 0,
             ];
         }

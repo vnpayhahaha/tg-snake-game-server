@@ -98,28 +98,6 @@ class TgSnakeNodeRepository extends IRepository
     }
 
     /**
-     * 归档节点（钱包变更时）
-     */
-    public function archiveNodes(int $groupId, int $walletCycle): int
-    {
-        return $this->model::query()
-            ->where('group_id', $groupId)
-            ->where('wallet_cycle', $walletCycle)
-            ->where('status', NodeConst::STATUS_ACTIVE)
-            ->update(['status' => NodeConst::STATUS_ARCHIVED]);
-    }
-
-    /**
-     * 批量归档指定节点ID
-     */
-    public function archiveNodesByIds(array $nodeIds): int
-    {
-        return $this->model::query()
-            ->whereIn('id', $nodeIds)
-            ->update(['status' => NodeConst::STATUS_ARCHIVED]);
-    }
-
-    /**
      * 统计当日节点数
      */
     public function countDailyNodes(int $groupId, string $date = null): int
@@ -332,8 +310,8 @@ class TgSnakeNodeRepository extends IRepository
         return [
             'total_nodes' => (clone $query)->count(),
             'active_nodes' => (clone $query)->where('status', NodeConst::STATUS_ACTIVE)->count(),
-            'archived_nodes' => (clone $query)->where('status', NodeConst::STATUS_ARCHIVED)->count(),
-            'matched_nodes' => (clone $query)->whereNotNull('matched_prize_id')->count(),
+            'matched_nodes' => (clone $query)->where('status', NodeConst::STATUS_MATCHED)->count(),
+            'cancelled_nodes' => (clone $query)->where('status', NodeConst::STATUS_CANCELLED)->count(),
             'total_amount' => (clone $query)->sum('amount'),
         ];
     }
@@ -357,8 +335,8 @@ class TgSnakeNodeRepository extends IRepository
         return [
             'total_nodes' => (clone $query)->count(),
             'active_nodes' => (clone $query)->where('status', NodeConst::STATUS_ACTIVE)->count(),
-            'archived_nodes' => (clone $query)->where('status', NodeConst::STATUS_ARCHIVED)->count(),
-            'matched_nodes' => (clone $query)->whereNotNull('matched_prize_id')->count(),
+            'matched_nodes' => (clone $query)->where('status', NodeConst::STATUS_MATCHED)->count(),
+            'cancelled_nodes' => (clone $query)->where('status', NodeConst::STATUS_CANCELLED)->count(),
             'total_amount' => (clone $query)->sum('amount'),
             'unique_players' => (clone $query)->distinct('player_address')->count('player_address'),
         ];
@@ -376,7 +354,8 @@ class TgSnakeNodeRepository extends IRepository
         return [
             'total_nodes' => (clone $query)->count(),
             'active_nodes' => (clone $query)->where('status', NodeConst::STATUS_ACTIVE)->count(),
-            'archived_nodes' => (clone $query)->where('status', NodeConst::STATUS_ARCHIVED)->count(),
+            'matched_nodes' => (clone $query)->where('status', NodeConst::STATUS_MATCHED)->count(),
+            'cancelled_nodes' => (clone $query)->where('status', NodeConst::STATUS_CANCELLED)->count(),
             'total_amount' => (clone $query)->sum('amount'),
         ];
     }
