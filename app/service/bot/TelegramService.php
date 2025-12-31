@@ -88,6 +88,12 @@ class TelegramService
                     $nodePage = (int)($parts[2] ?? 1);
                     $isCn = ($parts[3] ?? '1') === '1';
                     return $this->handleWinsPageCallback($chatId, $messageId, $callbackQueryId, $recordIndex, $nodePage, $isCn);
+                case 'my_tickets_page':
+                    // 我的票号分页: my_tickets_page:页码:用户ID:是否中文(1/0)
+                    $page = (int)($parts[1] ?? 1);
+                    $userId = (int)($parts[2] ?? 0);
+                    $isCn = ($parts[3] ?? '1') === '1';
+                    return $this->handleMyTicketsPageCallback($chatId, $messageId, $callbackQueryId, $page, $userId, $isCn);
                 default:
                     // 未知回调，应答但不做任何操作
                     $this->telegramBot->answerCallbackQuery(['callback_query_id' => $callbackQueryId]);
@@ -164,6 +170,49 @@ class TelegramService
 
         if (!$result['success']) {
             var_dump('======handleWinsPageCallback failed===', $result['message'] ?? 'unknown error');
+            return false;
+        }
+
+        // 构建编辑消息的数据
+        $editData = [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'text' => $result['message'],
+            'parse_mode' => 'HTML',
+        ];
+
+        // 添加InlineKeyboard
+        if (!empty($result['inline_keyboard'])) {
+            $editData['reply_markup'] = json_encode(['inline_keyboard' => $result['inline_keyboard']]);
+        }
+
+        var_dump('======editMessageText data===', $editData);
+
+        // 编辑原消息
+        $editResult = $this->telegramBot->editMessageText($editData);
+
+        var_dump('======editMessageText result===', $editResult);
+
+        return (bool)$editResult;
+    }
+
+    /**
+     * 处理我的票号分页回调
+     */
+    protected function handleMyTicketsPageCallback(int $chatId, int $messageId, string $callbackQueryId, int $page, int $userId, bool $isCn): bool
+    {
+        var_dump('======handleMyTicketsPageCallback start===', $chatId, $messageId, $page, $userId, $isCn);
+
+        // 调用commandService获取指定页的票号数据
+        $result = $this->commandService->handleMyTicketsCallback($chatId, $userId, $isCn, $page);
+
+        var_dump('======handleMyTicketsCallback result===', $result);
+
+        // 应答回调查询（移除加载状态）
+        $this->telegramBot->answerCallbackQuery(['callback_query_id' => $callbackQueryId]);
+
+        if (!$result['success']) {
+            var_dump('======handleMyTicketsPageCallback failed===', $result['message'] ?? 'unknown error');
             return false;
         }
 

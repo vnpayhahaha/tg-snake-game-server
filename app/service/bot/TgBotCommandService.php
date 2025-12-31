@@ -498,7 +498,7 @@ class TgBotCommandService
     /**
      * 我的票号命令
      */
-    protected function handleMyTickets(int $chatId, int $userId, bool $isCn): array
+    protected function handleMyTickets(int $chatId, int $userId, bool $isCn, int $page = 1): array
     {
         $config = $this->configService->getByTgChatId($chatId);
         if (!$config) {
@@ -517,7 +517,7 @@ class TgBotCommandService
         }
 
         // 获取用户所有参与游戏的节点（按时间倒排）
-        $nodes = $this->nodeService->getPlayerAllNodes($group->id, $userId, 50);
+        $nodes = $this->nodeService->getPlayerAllNodes($group->id, $userId, 200);
 
         if ($nodes->isEmpty()) {
             return [
@@ -525,6 +525,14 @@ class TgBotCommandService
                 'message' => $isCn ? '您还没有参与游戏' : 'You have not participated yet',
             ];
         }
+
+        // 分页逻辑
+        $perPage = 10;
+        $totalNodes = $nodes->count();
+        $totalPages = max(1, ceil($totalNodes / $perPage));
+        $page = max(1, min($page, $totalPages));
+        $offset = ($page - 1) * $perPage;
+        $pageNodes = $nodes->slice($offset, $perPage);
 
         // 状态图标映射
         $statusIcons = [
@@ -543,26 +551,56 @@ class TgBotCommandService
         ];
 
         $text = $isCn
-            ? "🎫 我的票号（共 {$nodes->count()} 条）\n\n"
-            : "🎫 My Tickets (Total: {$nodes->count()})\n\n";
+            ? "🎫 我的票号（共 {$totalNodes} 条）\n\n"
+            : "🎫 My Tickets (Total: {$totalNodes})\n\n";
 
-        foreach ($nodes as $index => $node) {
-            $num = $index + 1;
+        foreach ($pageNodes as $index => $node) {
+            $num = $offset + $index + 1;
             $statusIcon = $statusIcons[$node->status] ?? '❓';
             $statusName = $statusNames[$node->status] ?? ($isCn ? '未知' : 'Unknown');
             $walletSuffix = '...' . substr($node->player_address, -8);
+            $createdAt = $node->created_at ? date('Y-m-d H:i:s', strtotime($node->created_at)) : '-';
 
             $text .= "{$num}. {$statusIcon} {$node->ticket_serial_no}\n";
             $text .= "   🎫 {$node->ticket_number} | 💳{$walletSuffix} | {$statusName}\n";
+            $text .= "   💰 {$node->amount} TRX | 🕐 {$createdAt}\n";
         }
 
-        // 添加图例说明
+        // 添加图例说明和分页信息
         $text .= "\n";
         $text .= $isCn
-            ? "━━━━━━━━━━━━━━━━━━━━\n图例：🟢活跃 🏆已中奖 ❌未中奖"
-            : "━━━━━━━━━━━━━━━━━━━━\nLegend: 🟢Active 🏆Won ❌Not Won";
+            ? "━━━━━━━━━━━━━━━━━━━━\n图例：🟢活跃 🏆已中奖 ❌未中奖\n"
+            : "━━━━━━━━━━━━━━━━━━━━\nLegend: 🟢Active 🏆Won ❌Not Won\n";
+        $text .= $isCn
+            ? "第 {$page}/{$totalPages} 页"
+            : "Page {$page}/{$totalPages}";
 
-        return ['success' => true, 'message' => $text];
+        // 构建分页按钮
+        $inlineKeyboard = [];
+        if ($totalPages > 1) {
+            $buttons = [];
+            if ($page > 1) {
+                $buttons[] = [
+                    'text' => $isCn ? '◀ 上一页' : '◀ Prev',
+                    'callback_data' => "my_tickets_page:" . ($page - 1) . ":{$userId}:" . ($isCn ? '1' : '0'),
+                ];
+            }
+            if ($page < $totalPages) {
+                $buttons[] = [
+                    'text' => $isCn ? '下一页 ▶' : 'Next ▶',
+                    'callback_data' => "my_tickets_page:" . ($page + 1) . ":{$userId}:" . ($isCn ? '1' : '0'),
+                ];
+            }
+            if (!empty($buttons)) {
+                $inlineKeyboard[] = $buttons;
+            }
+        }
+
+        return [
+            'success' => true,
+            'message' => $text,
+            'inline_keyboard' => $inlineKeyboard,
+        ];
     }
 
     /**
@@ -842,6 +880,19 @@ class TgBotCommandService
     public function handleRecentWinsCallback(int $chatId, bool $isCn, int $recordIndex, int $nodePage): array
     {
         return $this->handleRecentWins($chatId, $isCn, $recordIndex, $nodePage);
+    }
+
+    /**
+     * 我的票号分页回调
+     * @param int $chatId
+     * @param int $userId
+     * @param bool $isCn
+     * @param int $page
+     * @return array
+     */
+    public function handleMyTicketsCallback(int $chatId, int $userId, bool $isCn, int $page): array
+    {
+        return $this->handleMyTickets($chatId, $userId, $isCn, $page);
     }
 
     /**
