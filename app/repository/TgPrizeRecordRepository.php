@@ -256,4 +256,91 @@ class TgPrizeRecordRepository extends IRepository
             ->limit($limit)
             ->get();
     }
+
+    /**
+     * 获取租户维度中奖统计
+     */
+    public function getTenantStatistics(array $groupIds): array
+    {
+        if (empty($groupIds)) {
+            return [
+                'total_count' => 0,
+                'total_prize_amount' => 0,
+                'total_platform_fee' => 0,
+                'total_winner_count' => 0,
+            ];
+        }
+
+        $query = $this->model::query()
+            ->whereIn('group_id', $groupIds)
+            ->where('status', PrizeConst::STATUS_COMPLETED);
+
+        return [
+            'total_count' => (clone $query)->count(),
+            'total_prize_amount' => (clone $query)->sum('prize_amount'),
+            'total_platform_fee' => (clone $query)->sum('platform_fee'),
+            'total_winner_count' => (clone $query)->sum('winner_count'),
+        ];
+    }
+
+    /**
+     * 获取租户今日中奖统计
+     */
+    public function getTenantTodayStatistics(array $groupIds): array
+    {
+        if (empty($groupIds)) {
+            return [
+                'count' => 0,
+                'prize_amount' => 0,
+            ];
+        }
+
+        $today = date('Y-m-d');
+        $query = $this->model::query()
+            ->whereIn('group_id', $groupIds)
+            ->whereDate('created_at', $today);
+
+        return [
+            'count' => $query->count(),
+            'prize_amount' => $query->sum('prize_amount'),
+        ];
+    }
+
+    /**
+     * 获取租户每日中奖趋势数据
+     */
+    public function getTenantDailyTrend(array $groupIds, int $days = 7): array
+    {
+        if (empty($groupIds)) {
+            return [];
+        }
+
+        $startDate = date('Y-m-d', strtotime("-{$days} days"));
+
+        return $this->model::query()
+            ->whereIn('group_id', $groupIds)
+            ->where('created_at', '>=', $startDate . ' 00:00:00')
+            ->selectRaw('DATE(created_at) as date, COUNT(*) as count, SUM(prize_amount) as prize_amount, SUM(platform_fee) as platform_fee')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * 获取群组中奖统计（用于排行榜）
+     */
+    public function getGroupPrizeStats(array $groupIds): Collection
+    {
+        if (empty($groupIds)) {
+            return collect([]);
+        }
+
+        return $this->model::query()
+            ->whereIn('group_id', $groupIds)
+            ->where('status', PrizeConst::STATUS_COMPLETED)
+            ->selectRaw('group_id, COUNT(*) as total_count, SUM(prize_amount) as total_prize_amount, SUM(platform_fee) as total_platform_fee')
+            ->groupBy('group_id')
+            ->get();
+    }
 }

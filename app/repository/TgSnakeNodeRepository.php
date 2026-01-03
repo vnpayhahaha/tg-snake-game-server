@@ -371,4 +371,93 @@ class TgSnakeNodeRepository extends IRepository
             ->orderByDesc('created_at')
             ->get();
     }
+
+    /**
+     * 获取租户维度节点统计
+     */
+    public function getTenantStatistics(array $groupIds): array
+    {
+        if (empty($groupIds)) {
+            return [
+                'total_nodes' => 0,
+                'active_nodes' => 0,
+                'matched_nodes' => 0,
+                'cancelled_nodes' => 0,
+                'total_amount' => 0,
+                'unique_players' => 0,
+            ];
+        }
+
+        $query = $this->model::query()->whereIn('group_id', $groupIds);
+
+        return [
+            'total_nodes' => (clone $query)->count(),
+            'active_nodes' => (clone $query)->where('status', NodeConst::STATUS_ACTIVE)->count(),
+            'matched_nodes' => (clone $query)->where('status', NodeConst::STATUS_MATCHED)->count(),
+            'cancelled_nodes' => (clone $query)->where('status', NodeConst::STATUS_CANCELLED)->count(),
+            'total_amount' => (clone $query)->sum('amount'),
+            'unique_players' => (clone $query)->distinct('player_address')->count('player_address'),
+        ];
+    }
+
+    /**
+     * 获取租户今日节点统计
+     */
+    public function getTenantTodayStatistics(array $groupIds): array
+    {
+        if (empty($groupIds)) {
+            return [
+                'nodes' => 0,
+                'amount' => 0,
+            ];
+        }
+
+        $today = date('Y-m-d');
+        $query = $this->model::query()
+            ->whereIn('group_id', $groupIds)
+            ->whereDate('created_at', $today);
+
+        return [
+            'nodes' => $query->count(),
+            'amount' => $query->sum('amount'),
+        ];
+    }
+
+    /**
+     * 获取租户每日趋势数据
+     */
+    public function getTenantDailyTrend(array $groupIds, int $days = 7): array
+    {
+        if (empty($groupIds)) {
+            return [];
+        }
+
+        $startDate = date('Y-m-d', strtotime("-{$days} days"));
+
+        return $this->model::query()
+            ->whereIn('group_id', $groupIds)
+            ->where('created_at', '>=', $startDate . ' 00:00:00')
+            ->selectRaw('DATE(created_at) as date, COUNT(*) as count, SUM(amount) as amount')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * 获取群组节点统计（用于排行榜）
+     */
+    public function getGroupNodeStats(array $groupIds): Collection
+    {
+        if (empty($groupIds)) {
+            return collect([]);
+        }
+
+        return $this->model::query()
+            ->whereIn('group_id', $groupIds)
+            ->selectRaw('group_id, COUNT(*) as total_nodes, SUM(amount) as total_amount')
+            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as active_nodes', [NodeConst::STATUS_ACTIVE])
+            ->groupBy('group_id')
+            ->get();
+    }
 }

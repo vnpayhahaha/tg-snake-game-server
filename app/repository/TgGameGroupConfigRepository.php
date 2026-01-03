@@ -135,4 +135,76 @@ class TgGameGroupConfigRepository extends IRepository
                 'wallet_change_end_at' => null,
             ]);
     }
+
+    /**
+     * 获取租户下所有群组配置（带分页）
+     */
+    public function getByTenantIdPaginated(string $tenantId, array $params = [], int $page = 1, int $pageSize = 10): array
+    {
+        $query = $this->model::query()
+            ->where('tenant_id', $tenantId)
+            ->with('group');
+
+        // 支持状态筛选
+        if (isset($params['status']) && filled($params['status'])) {
+            $query->where('status', $params['status']);
+        }
+
+        // 支持群组名称搜索
+        if (isset($params['tg_chat_title']) && filled($params['tg_chat_title'])) {
+            $query->where('tg_chat_title', 'like', '%' . $params['tg_chat_title'] . '%');
+        }
+
+        $total = $query->count();
+        $list = $query->orderByDesc('created_at')
+            ->offset(($page - 1) * $pageSize)
+            ->limit($pageSize)
+            ->get();
+
+        return [
+            'total' => $total,
+            'list' => $list,
+            'page' => $page,
+            'page_size' => $pageSize,
+        ];
+    }
+
+    /**
+     * 获取租户下群组统计概览
+     */
+    public function getTenantGroupStats(string $tenantId): array
+    {
+        $query = $this->model::query()->where('tenant_id', $tenantId);
+
+        return [
+            'total_groups' => (clone $query)->count(),
+            'active_groups' => (clone $query)->where('status', ConfigConst::STATUS_ENABLED)->count(),
+            'inactive_groups' => (clone $query)->where('status', ConfigConst::STATUS_DISABLED)->count(),
+        ];
+    }
+
+    /**
+     * 验证配置是否属于指定租户
+     */
+    public function belongsToTenant(int $configId, string $tenantId): bool
+    {
+        return $this->model::query()
+            ->where('id', $configId)
+            ->where('tenant_id', $tenantId)
+            ->exists();
+    }
+
+    /**
+     * 获取租户下所有群组ID列表
+     */
+    public function getGroupIdsByTenantId(string $tenantId): array
+    {
+        return $this->model::query()
+            ->where('tenant_id', $tenantId)
+            ->with('group')
+            ->get()
+            ->pluck('group.id')
+            ->filter()
+            ->toArray();
+    }
 }
