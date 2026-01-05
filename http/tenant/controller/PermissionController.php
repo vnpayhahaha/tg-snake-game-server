@@ -26,6 +26,328 @@ class PermissionController extends BasicController
         $jsonData = <<< JSON
 [
 {
+  "id": 300,
+  "parent_id": 0,
+  "name": "TgGame",
+  "meta": {
+    "i18n": "tgGame.index",
+    "icon": "mdi:gamepad-variant-outline",
+    "type": "M",
+    "affix": false,
+    "cache": true,
+    "title": "TG游戏管理",
+    "hidden": false,
+    "copyright": true,
+    "activeName": "",
+    "componentPath": "modules/",
+    "componentSuffix": ".vue",
+    "breadcrumbEnable": true
+  },
+  "path": "/tgGame",
+  "component": "game/views/TgGameGroup/Index",
+  "redirect": "",
+  "status": 1,
+  "sort": 0,
+  "created_by": 1,
+  "updated_by": 1,
+  "created_at": "2026-01-05 10:00:00",
+  "updated_at": "2026-01-05 10:00:00",
+  "remark": "",
+  "children": [
+    {
+      "id": 301,
+      "parent_id": 300,
+      "name": "TgGameGroup",
+      "meta": {
+        "i18n": "tgGameGroup.index",
+        "icon": "mdi:account-group-outline",
+        "type": "M",
+        "affix": false,
+        "cache": true,
+        "title": "游戏群组",
+        "hidden": false,
+        "copyright": true,
+        "componentPath": "modules/",
+        "componentSuffix": ".vue",
+        "breadcrumbEnable": true
+      },
+      "path": "/tgGame/group",
+      "component": "game/views/TgGameGroup/Index",
+      "redirect": "",
+      "status": 1,
+      "sort": 0,
+      "created_by": 1,
+      "updated_by": 1,
+      "created_at": "2026-01-05 10:00:00",
+      "updated_at": "2026-01-05 10:00:00",
+      "remark": "",
+      "children": [
+        {
+          "id": 302,
+          "parent_id": 301,
+          "name": "tg_game:group:list",
+          "meta": {
+            "i18n": "tgGameMenu.tgGameGroup.list",
+            "type": "B",
+            "title": "群组列表"
+          },
+          "path": "",
+          "component": "",
+          "redirect": "",
+          "status": 1,
+          "sort": 0,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-01-05 10:00:00",
+          "updated_at": "2026-01-05 10:00:00",
+          "remark": "",
+          "children": []
+        },
+        {
+          "id": 303,
+          "parent_id": 301,
+          "name": "tg_game:group:update",
+          "meta": {
+            "i18n": "tgGameMenu.tgGameGroup.update",
+            "type": "B",
+            "title": "修改群组配置"
+          },
+          "path": "",
+          "component": "",
+          "redirect": "",
+          "status": 1,
+          "sort": 0,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-01-05 10:00:00",
+          "updated_at": "2026-01-05 10:00:00",
+          "remark": "",
+          "children": []
+        },
+        {
+          "id": 304,
+          "parent_id": 301,
+          "name": "tg_game:group:update_wallet",
+          "meta": {
+            "i18n": "tgGameMenu.tgGameGroup.updateWallet",
+            "type": "B",
+            "title": "更新收款钱包"
+          },
+          "path": "",
+          "component": "",
+          "redirect": "",
+          "status": 1,
+          "sort": 0,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-01-05 10:00:00",
+          "updated_at": "2026-01-05 10:00:00",
+          "remark": "",
+          "children": []
+        },
+        {
+          "id": 305,
+          "parent_id": 301,
+          "name": "tg_game:group:cancel_wallet_change",
+          "meta": {
+            "i18n": "tgGameMenu.tgGameGroup.cancelWalletChange",
+            "type": "B",
+            "title": "取消钱包变更"
+          },
+          "path": "",
+          "component": "",
+          "redirect": "",
+          "status": 1,
+          "sort": 0,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-01-05 10:00:00",
+          "updated_at": "2026-01-05 10:00:00",
+          "remark": "",
+          "children": []
+        },
+        {
+          "id": 306,
+          "parent_id": 301,
+          "name": "tg_game:group:update_hot_wallet",
+          "meta": {
+            "i18n": "tgGameMenu.tgGameGroup.updateHotWallet",
+            "type": "B",
+            "title": "更新热钱包"
+          },
+          "path": "",
+          "component": "",
+          "redirect": "",
+          "status": 1,
+          "sort": 0,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-01-05 10:00:00",
+          "updated_at": "2026-01-05 10:00:00",
+          "remark": "",
+          "children": []
+        },
+        {
+          "id": 307,
+          "parent_id": 301,
+          "name": "tg_game:group:update_status",
+          "meta": {
+            "i18n": "tgGameMenu.tgGameGroup.updateStatus",
+            "type": "B",
+            "title": "更新状态"
+          },
+          "path": "",
+          "component": "",
+          "redirect": "",
+          "status": 1,
+          "sort": 0,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-01-05 10:00:00",
+          "updated_at": "2026-01-05 10:00:00",
+          "remark": "",
+          "children": []
+        },
+        {
+          "id": 308,
+          "parent_id": 301,
+          "name": "tg_game:group:statistics",
+          "meta": {
+            "i18n": "tgGameMenu.tgGameGroup.statistics",
+            "type": "B",
+            "title": "查看统计"
+          },
+          "path": "",
+          "component": "",
+          "redirect": "",
+          "status": 1,
+          "sort": 0,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-01-05 10:00:00",
+          "updated_at": "2026-01-05 10:00:00",
+          "remark": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": 310,
+      "parent_id": 300,
+      "name": "TgStatistics",
+      "meta": {
+        "i18n": "tgStatistics.index",
+        "icon": "mdi:chart-line",
+        "type": "M",
+        "affix": false,
+        "cache": true,
+        "title": "数据统计",
+        "hidden": false,
+        "copyright": true,
+        "componentPath": "modules/",
+        "componentSuffix": ".vue",
+        "breadcrumbEnable": true
+      },
+      "path": "/tgGame/statistics",
+      "component": "game/views/TgStatistics/Index",
+      "redirect": "",
+      "status": 1,
+      "sort": 0,
+      "created_by": 1,
+      "updated_by": 1,
+      "created_at": "2026-01-05 10:00:00",
+      "updated_at": "2026-01-05 10:00:00",
+      "remark": "",
+      "children": [
+        {
+          "id": 311,
+          "parent_id": 310,
+          "name": "tg_game:statistics:overview",
+          "meta": {
+            "i18n": "tgGameMenu.tgStatistics.overview",
+            "type": "B",
+            "title": "数据概览"
+          },
+          "path": "",
+          "component": "",
+          "redirect": "",
+          "status": 1,
+          "sort": 0,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-01-05 10:00:00",
+          "updated_at": "2026-01-05 10:00:00",
+          "remark": "",
+          "children": []
+        },
+        {
+          "id": 312,
+          "parent_id": 310,
+          "name": "tg_game:statistics:group_ranking",
+          "meta": {
+            "i18n": "tgGameMenu.tgStatistics.groupRanking",
+            "type": "B",
+            "title": "群组排行"
+          },
+          "path": "",
+          "component": "",
+          "redirect": "",
+          "status": 1,
+          "sort": 0,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-01-05 10:00:00",
+          "updated_at": "2026-01-05 10:00:00",
+          "remark": "",
+          "children": []
+        },
+        {
+          "id": 313,
+          "parent_id": 310,
+          "name": "tg_game:statistics:daily",
+          "meta": {
+            "i18n": "tgGameMenu.tgStatistics.daily",
+            "type": "B",
+            "title": "每日统计"
+          },
+          "path": "",
+          "component": "",
+          "redirect": "",
+          "status": 1,
+          "sort": 0,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-01-05 10:00:00",
+          "updated_at": "2026-01-05 10:00:00",
+          "remark": "",
+          "children": []
+        },
+        {
+          "id": 314,
+          "parent_id": 310,
+          "name": "tg_game:statistics:trend",
+          "meta": {
+            "i18n": "tgGameMenu.tgStatistics.trend",
+            "type": "B",
+            "title": "趋势分析"
+          },
+          "path": "",
+          "component": "",
+          "redirect": "",
+          "status": 1,
+          "sort": 0,
+          "created_by": 1,
+          "updated_by": 1,
+          "created_at": "2026-01-05 10:00:00",
+          "updated_at": "2026-01-05 10:00:00",
+          "remark": "",
+          "children": []
+        }
+      ]
+    }
+  ]
+},
+{
   "id": 168,
   "parent_id": 0,
   "name": "CollectionOrder",
