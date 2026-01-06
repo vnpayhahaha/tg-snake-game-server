@@ -139,6 +139,11 @@ class TgTronMonitorService extends BaseService
                 throw new \Exception('群组配置不存在');
             }
 
+            // 将金额从 SUN 转换为 TRX（1 TRX = 1,000,000 SUN）
+            // TronGrid API 返回的是 SUN 单位，数据库存储 TRX 单位
+            $amountTrx = \app\lib\helper\TronWebHelper::sunToTrx($txData['amount']);
+            $txData['amount'] = $amountTrx;
+
             // 记录交易日志
             $txLog = $this->logTransaction([
                 'group_id' => $groupId,
