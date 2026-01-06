@@ -58,14 +58,31 @@ class TgPlayerWalletBindingService extends BaseService
             Db::beginTransaction();
 
             // 检查钱包地址在群组中是否已被其他人绑定
-            $isBound = $this->repository->isWalletBoundInGroup(
+            $existingBinding = $this->repository->clearWalletBindingInGroup(
                 $data['group_id'],
                 $data['wallet_address'],
                 $data['tg_user_id']
             );
 
-            if ($isBound) {
-                throw new \Exception('该钱包地址已被其他玩家绑定');
+            // 如果有其他人绑定了这个钱包，记录解绑日志
+            if ($existingBinding) {
+                $this->bindingLogRepository->logChange([
+                    'group_id' => $data['group_id'],
+                    'tg_user_id' => $existingBinding->tg_user_id,
+                    'tg_username' => $existingBinding->tg_username ?? '',
+                    'tg_first_name' => $existingBinding->tg_first_name ?? '',
+                    'tg_last_name' => $existingBinding->tg_last_name ?? '',
+                    'old_wallet_address' => $data['wallet_address'],
+                    'new_wallet_address' => '',
+                    'change_type' => BindingLogConst::CHANGE_TYPE_UNBIND,
+                ]);
+
+                Log::info('钱包地址已从其他用户解绑', [
+                    'group_id' => $data['group_id'],
+                    'wallet_address' => $data['wallet_address'],
+                    'old_user_id' => $existingBinding->tg_user_id,
+                    'new_user_id' => $data['tg_user_id'],
+                ]);
             }
 
             // 检查用户是否已有绑定
@@ -98,6 +115,7 @@ class TgPlayerWalletBindingService extends BaseService
                 'message' => $changeType == BindingLogConst::CHANGE_TYPE_FIRST_BIND ? '绑定成功' : '更新绑定成功',
                 'binding' => $binding,
                 'is_first_bind' => $changeType == BindingLogConst::CHANGE_TYPE_FIRST_BIND,
+                'replaced_user' => $existingBinding ? $existingBinding->tg_user_id : null,
             ];
         } catch (\Exception $e) {
             Db::rollBack();

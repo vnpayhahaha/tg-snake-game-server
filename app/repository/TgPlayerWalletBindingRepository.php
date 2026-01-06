@@ -148,6 +148,29 @@ class TgPlayerWalletBindingRepository extends IRepository
     }
 
     /**
+     * 清除群组中指定钱包地址的绑定（将wallet_address设为空字符串）
+     * @return ModelTgPlayerWalletBinding|null 返回被清除绑定的记录
+     */
+    public function clearWalletBindingInGroup(int $groupId, string $walletAddress, int $excludeUserId = null): ?ModelTgPlayerWalletBinding
+    {
+        $query = $this->model::query()
+            ->where('group_id', $groupId)
+            ->where('wallet_address', $walletAddress);
+
+        if ($excludeUserId !== null) {
+            $query->where('tg_user_id', '!=', $excludeUserId);
+        }
+
+        $binding = $query->first();
+        if ($binding) {
+            $binding->update(['wallet_address' => '']);
+            return $binding;
+        }
+
+        return null;
+    }
+
+    /**
      * 通过钱包地址反查Telegram用户信息
      */
     public function getUserByWalletAddress(int $groupId, string $walletAddress): ?ModelTgPlayerWalletBinding
