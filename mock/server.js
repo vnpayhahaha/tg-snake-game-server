@@ -212,9 +212,9 @@ app.post('/wallet/getnowblock', (req, res) => {
  */
 app.post('/wallet/hextoaddress', (req, res) => {
     const { value } = req.body;
-    // 简化处理
+    // 简化处理：返回 base58checkAddress 字段（TronWebHelper 期望的字段名）
     res.json({
-        base58: 'T' + Buffer.from(value.slice(2), 'hex').toString().slice(0, 33).padEnd(33, 'x')
+        base58checkAddress: 'T' + Buffer.from(value.slice(2), 'hex').toString().slice(0, 33).padEnd(33, 'x')
     });
 });
 

@@ -8,7 +8,7 @@ use Carbon\Carbon;
 * @property int $id 主键 主键
 * @property int $group_id 群组ID
 * @property int $wallet_cycle 钱包周期（对应wallet_change_count）
-* @property string $ticket_number 购彩凭证(00-99)
+* @property string $ticket_number 购彩凭证(00-99，取交易哈希中所有数字的最后两位)
 * @property string $ticket_serial_no 凭证流水号(格式: YYYYMMDD-序号，如: 20250108-001)
 * @property string $wallet_address 收款地址
 * @property string $player_address 玩家钱包地址
@@ -36,6 +36,11 @@ final class ModelTgSnakeNode extends BasicModel
      * @var string
      */
     protected $primaryKey = 'id';
+
+    /**
+     * 禁用 updated_at 时间戳（数据库表中没有此字段）
+     */
+    const UPDATED_AT = null;
     
     /**
      * The attributes that are mass assignable.

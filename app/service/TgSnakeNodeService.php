@@ -22,15 +22,29 @@ class TgSnakeNodeService extends BaseService
     protected TgGameGroupConfigRepository $configRepository;
 
     /**
-     * 根据交易哈希提取凭证号（取最后6位十六进制字符）
+     * 根据交易哈希提取凭证号（取最后2位数字，00-99）
+     * 规则：
+     * - 从哈希中提取所有数字，取最后两位
+     * - 如果没有数字，返回 "00"
+     * - 如果只有一个数字，十位补 0（如 "5" -> "05"）
      */
     public function extractTicketFromTxHash(string $txHash): string
     {
         // 移除 0x 前缀
         $hash = str_starts_with($txHash, '0x') ? substr($txHash, 2) : $txHash;
-        // 取最后6位
-        $ticket = substr($hash, -6);
-        return strtoupper($ticket);
+
+        // 提取所有数字
+        preg_match_all('/\d/', $hash, $matches);
+        $digits = implode('', $matches[0]);
+
+        // 根据数字数量返回凭证号
+        if (empty($digits)) {
+            return '00';
+        } elseif (strlen($digits) === 1) {
+            return '0' . $digits;
+        } else {
+            return substr($digits, -2);
+        }
     }
 
     /**

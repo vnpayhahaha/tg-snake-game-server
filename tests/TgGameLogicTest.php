@@ -52,7 +52,7 @@ class TgGameLogicTest extends TestCase
             'from_address' => $transaction['from_address'],
             'to_address' => $transaction['to_address'],
             'amount' => $transaction['amount'],
-            'ticket_number' => '7984210759', // 从tx_hash提取
+            'ticket_number' => '59', // 从tx_hash提取最后两位数字
             'position_index' => 1,
             'status' => 1, // 活跃
             'created_at' => date('Y-m-d H:i:s'),
@@ -66,8 +66,8 @@ class TgGameLogicTest extends TestCase
         echo "  交易哈希: {$node['tx_hash']}\n";
 
         $this->assertArrayHasKey('ticket_number', $node, '节点应该包含票号');
-        $this->assertEquals(10, strlen($node['ticket_number']), '票号长度应为10位');
-        $this->assertMatchesRegularExpression('/^\d+$/', $node['ticket_number'], '票号应只包含数字');
+        $this->assertEquals(2, strlen($node['ticket_number']), '票号长度应为2位');
+        $this->assertMatchesRegularExpression('/^\d{2}$/', $node['ticket_number'], '票号应为2位数字(00-99)');
     }
 
     /**
