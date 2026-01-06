@@ -1,0 +1,41 @@
+{
+  "wallets": {
+    "TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx": {
+      "address": "TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "balance": 10000000000,
+      "label": "测试收款钱包1"
+    },
+    "TYxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx": {
+      "address": "TYxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "balance": 5000000000,
+      "label": "测试热钱包1"
+    },
+    "TZxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx": {
+      "address": "TZxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "balance": 99995000000,
+      "label": "测试玩家钱包"
+    },
+    "TKbJZ5kk9uZPhCJJjzxsuTWWRxWwCsatjP": {
+      "address": "TKbJZ5kk9uZPhCJJjzxsuTWWRxWwCsatjP",
+      "balance": 195000000,
+      "label": "test1"
+    }
+  },
+  "transactions": [
+    {
+      "tx_hash": "7b22907d2ace7bd1a06807ee817a3ee9bf3c29493f61298e537997207c288c3f",
+      "from_address": "TZxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "to_address": "TKbJZ5kk9uZPhCJJjzxsuTWWRxWwCsatjP",
+      "amount": 5000000,
+      "block_height": 71204650,
+      "block_timestamp": 1767681150489,
+      "status": "SUCCESS",
+      "contract_type": "TransferContract"
+    }
+  ],
+  "config": {
+    "autoIncrementTxId": 2,
+    "defaultBlockHeight": 50000000,
+    "blockInterval": 3
+  }
+}

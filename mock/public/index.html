@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock TRON Wallet Console</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #00d4aa; margin-bottom: 20px; text-align: center; }
+        h2 { color: #00d4aa; margin: 20px 0 15px; font-size: 18px; }
+        .card {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .form-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .form-group { flex: 1; min-width: 200px; }
+        label { display: block; margin-bottom: 5px; color: #888; font-size: 12px; }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            background: #0f0f23;
+            color: #fff;
+            font-size: 14px;
+        }
+        input:focus, select:focus { outline: none; border-color: #00d4aa; }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #00d4aa; color: #000; }
+        .btn-primary:hover { background: #00b894; }
+        .btn-danger { background: #e74c3c; color: #fff; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-secondary { background: #555; color: #fff; }
+        .btn-secondary:hover { background: #666; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
+        th { color: #00d4aa; font-weight: 500; }
+        tr:hover { background: rgba(0,212,170,0.05); }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .badge-success { background: #27ae60; }
+        .badge-warning { background: #f39c12; }
+        .address { font-family: monospace; font-size: 12px; }
+        .amount { color: #00d4aa; font-weight: bold; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab {
+            padding: 10px 20px;
+            background: #16213e;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            border-radius: 5px 5px 0 0;
+        }
+        .tab.active { background: #00d4aa; color: #000; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .quick-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 5px;
+            color: #fff;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+        .toast-success { background: #27ae60; }
+        .toast-error { background: #e74c3c; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .empty { text-align: center; color: #666; padding: 40px; }
+        .refresh-btn { float: right; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Mock TRON Wallet Console</h1>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('wallets')">钱包管理</button>
+            <button class="tab" onclick="switchTab('transactions')">交易记录</button>
+            <button class="tab" onclick="switchTab('transfer')">模拟转账</button>
+        </div>
+
+        <!-- 钱包管理 -->
+        <div id="wallets" class="tab-content active">
+            <div class="card">
+                <h2>添加/更新钱包</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>钱包地址 (T开头，34位)</label>
+                        <input type="text" id="walletAddress" placeholder="TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                    </div>
+                    <div class="form-group">
+                        <label>余额 (TRX)</label>
+                        <input type="number" id="walletBalance" placeholder="1000" step="0.000001">
+                    </div>
+                    <div class="form-group">
+                        <label>标签</label>
+                        <input type="text" id="walletLabel" placeholder="测试钱包">
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="saveWallet()">保存钱包</button>
+            </div>
+
+            <div class="card">
+                <h2>钱包列表 <button class="btn-secondary refresh-btn" onclick="loadWallets()">刷新</button></h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>地址</th>
+                            <th>标签</th>
+                            <th>余额 (TRX)</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="walletList"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 交易记录 -->
+        <div id="transactions" class="tab-content">
+            <div class="card">
+                <h2>交易记录
+                    <button class="btn-secondary refresh-btn" onclick="loadTransactions()">刷新</button>
+                    <button class="btn-danger refresh-btn" style="margin-right:10px" onclick="clearTransactions()">清空</button>
+                </h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>交易哈希</th>
+                            <th>发送方</th>
+                            <th>接收方</th>
+                            <th>金额 (TRX)</th>
+                            <th>状态</th>
+                            <th>时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionList"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 模拟转账 -->
+        <div id="transfer" class="tab-content">
+            <div class="card">
+                <h2>快速转账</h2>
+                <p style="color:#888;margin-bottom:15px;">模拟TRON转账交易，用于测试钱包监听功能</p>
+
+                <div class="quick-actions">
+                    <button class="btn-secondary" onclick="quickFill(10)">10 TRX</button>
+                    <button class="btn-secondary" onclick="quickFill(50)">50 TRX</button>
+                    <button class="btn-secondary" onclick="quickFill(100)">100 TRX</button>
+                    <button class="btn-secondary" onclick="quickFill(500)">500 TRX</button>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>发送方地址</label>
+                        <select id="fromAddress" onchange="updateFromBalance()">
+                            <option value="">选择发送方钱包</option>
+                        </select>
+                        <small id="fromBalance" style="color:#888;margin-top:5px;display:block;"></small>
+                    </div>
+                    <div class="form-group">
+                        <label>接收方地址</label>
+                        <select id="toAddress">
+                            <option value="">选择接收方钱包</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>转账金额 (TRX)</label>
+                        <input type="number" id="transferAmount" placeholder="10" step="0.000001">
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="createTransfer()">执行转账</button>
+            </div>
+
+            <div class="card">
+                <h2>手动输入地址转账</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>发送方地址</label>
+                        <input type="text" id="manualFromAddress" placeholder="TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                    </div>
+                    <div class="form-group">
+                        <label>接收方地址</label>
+                        <input type="text" id="manualToAddress" placeholder="TYxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>转账金额 (TRX)</label>
+                        <input type="number" id="manualTransferAmount" placeholder="10" step="0.000001">
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="createManualTransfer()">执行转账</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let wallets = [];
+
+        // 切换标签页
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[onclick="switchTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+
+            if (tabId === 'wallets') loadWallets();
+            if (tabId === 'transactions') loadTransactions();
+            if (tabId === 'transfer') { loadWallets(); updateWalletSelects(); }
+        }
+
+        // 显示提示
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // 加载钱包列表
+        async function loadWallets() {
+            try {
+                const res = await fetch(`${API_BASE}/api/wallets`);
+                const data = await res.json();
+                wallets = data.data || [];
+                renderWallets();
+                updateWalletSelects();
+            } catch (e) {
+                showToast('加载钱包失败', 'error');
+            }
+        }
+
+        // 渲染钱包列表
+        function renderWallets() {
+            const tbody = document.getElementById('walletList');
+            if (wallets.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty">暂无钱包数据</td></tr>';
+                return;
+            }
+            tbody.innerHTML = wallets.map(w => `
+                <tr>
+                    <td class="address">${w.address}</td>
+                    <td>${w.label || '-'}</td>
+                    <td class="amount">${w.balance_trx.toLocaleString()}</td>
+                    <td>
+                        <button class="btn-secondary" onclick="editWallet('${w.address}', ${w.balance_trx}, '${w.label || ''}')">编辑</button>
+                        <button class="btn-danger" onclick="deleteWallet('${w.address}')">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 更新钱包下拉选择
+        function updateWalletSelects() {
+            const options = wallets.map(w =>
+                `<option value="${w.address}">${w.label || w.address.slice(0,10)}... (${w.balance_trx} TRX)</option>`
+            ).join('');
+            document.getElementById('fromAddress').innerHTML = '<option value="">选择发送方钱包</option>' + options;
+            document.getElementById('toAddress').innerHTML = '<option value="">选择接收方钱包</option>' + options;
+        }
+
+        // 更新发送方余额显示
+        function updateFromBalance() {
+            const addr = document.getElementById('fromAddress').value;
+            const wallet = wallets.find(w => w.address === addr);
+            document.getElementById('fromBalance').textContent = wallet ? `可用余额: ${wallet.balance_trx} TRX` : '';
+        }
+
+        // 保存钱包
+        async function saveWallet() {
+            const address = document.getElementById('walletAddress').value.trim();
+            const balance = document.getElementById('walletBalance').value;
+            const label = document.getElementById('walletLabel').value.trim();
+
+            if (!address) return showToast('请输入钱包地址', 'error');
+
+            try {
+                const res = await fetch(`${API_BASE}/api/wallets`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ address, balance, label })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('钱包保存成功');
+                    document.getElementById('walletAddress').value = '';
+                    document.getElementById('walletBalance').value = '';
+                    document.getElementById('walletLabel').value = '';
+                    loadWallets();
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (e) {
+                showToast('保存失败', 'error');
+            }
+        }
+
+        // 编辑钱包
+        function editWallet(address, balance, label) {
+            document.getElementById('walletAddress').value = address;
+            document.getElementById('walletBalance').value = balance;
+            document.getElementById('walletLabel').value = label;
+            switchTab('wallets');
+        }
+
+        // 删除钱包
+        async function deleteWallet(address) {
+            if (!confirm('确定删除此钱包？')) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/wallets/${address}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('钱包已删除');
+                    loadWallets();
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (e) {
+                showToast('删除失败', 'error');
+            }
+        }
+
+        // 加载交易记录
+        async function loadTransactions() {
+            try {
+                const res = await fetch(`${API_BASE}/api/transactions`);
+                const data = await res.json();
+                renderTransactions(data.data || []);
+            } catch (e) {
+                showToast('加载交易失败', 'error');
+            }
+        }
+
+        // 渲染交易记录
+        function renderTransactions(transactions) {
+            const tbody = document.getElementById('transactionList');
+            if (transactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty">暂无交易记录</td></tr>';
+                return;
+            }
+            tbody.innerHTML = transactions.map(tx => `
+                <tr>
+                    <td class="address" title="${tx.tx_hash}">${tx.tx_hash.slice(0,16)}...</td>
+                    <td class="address" title="${tx.from_address}">${tx.from_address.slice(0,10)}...</td>
+                    <td class="address" title="${tx.to_address}">${tx.to_address.slice(0,10)}...</td>
+                    <td class="amount">${tx.amount_trx}</td>
+                    <td><span class="badge badge-success">${tx.status}</span></td>
+                    <td>${tx.time}</td>
+                    <td><button class="btn-danger" onclick="deleteTransaction('${tx.tx_hash}')">删除</button></td>
+                </tr>
+            `).join('');
+        }
+
+        // 删除交易
+        async function deleteTransaction(txHash) {
+            try {
+                const res = await fetch(`${API_BASE}/api/transactions/${txHash}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('交易已删除');
+                    loadTransactions();
+                }
+            } catch (e) {
+                showToast('删除失败', 'error');
+            }
+        }
+
+        // 清空交易
+        async function clearTransactions() {
+            if (!confirm('确定清空所有交易记录？')) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/transactions`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('交易已清空');
+                    loadTransactions();
+                }
+            } catch (e) {
+                showToast('清空失败', 'error');
+            }
+        }
+
+        // 快速填充金额
+        function quickFill(amount) {
+            document.getElementById('transferAmount').value = amount;
+        }
+
+        // 创建转账
+        async function createTransfer() {
+            const from_address = document.getElementById('fromAddress').value;
+            const to_address = document.getElementById('toAddress').value;
+            const amount_trx = document.getElementById('transferAmount').value;
+
+            if (!from_address || !to_address || !amount_trx) {
+                return showToast('请填写完整信息', 'error');
+            }
+
+            await doTransfer(from_address, to_address, amount_trx);
+        }
+
+        // 手动转账
+        async function createManualTransfer() {
+            const from_address = document.getElementById('manualFromAddress').value.trim();
+            const to_address = document.getElementById('manualToAddress').value.trim();
+            const amount_trx = document.getElementById('manualTransferAmount').value;
+
+            if (!from_address || !to_address || !amount_trx) {
+                return showToast('请填写完整信息', 'error');
+            }
+
+            await doTransfer(from_address, to_address, amount_trx);
+        }
+
+        // 执行转账
+        async function doTransfer(from_address, to_address, amount_trx) {
+            try {
+                const res = await fetch(`${API_BASE}/api/transactions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ from_address, to_address, amount_trx })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`转账成功! TX: ${data.data.tx_hash.slice(0,16)}...`);
+                    loadWallets();
+                    loadTransactions();
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (e) {
+                showToast('转账失败', 'error');
+            }
+        }
+
+        // 初始化
+        loadWallets();
+    </script>
+</body>
+</html>
