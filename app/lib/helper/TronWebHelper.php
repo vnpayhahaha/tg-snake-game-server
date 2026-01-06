@@ -16,17 +16,23 @@ class TronWebHelper
     protected ?string $apiKey;
 
     /**
-     * @param string $apiUrl TRON API URL (如 https://api.trongrid.io)
-     * @param string|null $apiKey API密钥（可选）
+     * @param string|null $apiUrl TRON API URL (如 https://api.trongrid.io)，为空时从环境变量读取
+     * @param string|null $apiKey API密钥（可选），为空时从环境变量读取
      */
-    public function __construct(string $apiUrl = 'https://api.trongrid.io', ?string $apiKey = null)
+    public function __construct(?string $apiUrl = null, ?string $apiKey = null)
     {
-        $this->apiUrl = rtrim($apiUrl, '/');
-        $this->apiKey = $apiKey;
+        // 优先使用传入参数，否则从环境变量读取
+        $this->apiUrl = rtrim($apiUrl ?: getenv('TRON_API_URL') ?: 'https://api.trongrid.io', '/');
+        $this->apiKey = $apiKey ?: (getenv('TRON_API_KEY') ?: null);
+
+        Log::debug("TronWebHelper 初始化", [
+            'api_url' => $this->apiUrl,
+            'has_api_key' => !empty($this->apiKey),
+        ]);
 
         $headers = ['Content-Type' => 'application/json'];
-        if ($apiKey) {
-            $headers['TRON-PRO-API-KEY'] = $apiKey;
+        if ($this->apiKey) {
+            $headers['TRON-PRO-API-KEY'] = $this->apiKey;
         }
 
         $this->httpClient = new Client([

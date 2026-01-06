@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.MOCK_PORT || 3100;
+const PORT = process.env.MOCK_PORT || 8080;
 const DATA_FILE = path.join(__dirname, 'data.json');
 
 // 中间件
@@ -101,6 +101,7 @@ app.get('/v1/accounts/:address/transactions', (req, res) => {
     transactions = transactions.slice(0, maxLimit);
 
     // 转换为TronGrid格式
+    // 注意：直接使用Base58地址，TronWebHelper会检测到已经是Base58格式并直接返回
     const tronGridData = transactions.map(tx => ({
         txID: tx.tx_hash,
         blockNumber: tx.block_height,
@@ -108,11 +109,11 @@ app.get('/v1/accounts/:address/transactions', (req, res) => {
         ret: [{ contractRet: tx.status }],
         raw_data: {
             contract: [{
-                type: 'TransferContract',
+                type: tx.contract_type || 'TransferContract',
                 parameter: {
                     value: {
-                        owner_address: addressToHex(tx.from_address),
-                        to_address: addressToHex(tx.to_address),
+                        owner_address: tx.from_address,  // 直接使用Base58地址
+                        to_address: tx.to_address,       // 直接使用Base58地址
                         amount: tx.amount
                     }
                 }
